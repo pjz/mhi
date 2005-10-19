@@ -6,10 +6,11 @@
 #
 # Commands to make work: sort, comp, forw 
 #
-# * sort will just store a sort order to apply to output instead of
-#   actually touching the mailboxes.
+# * sort should just store a sort order to apply to output instead of
+#   actually touching the mailboxes.  This will affect the working of
+#   anything that takes a msgset as well as scan, next, prev, and pick
 #
-# some code taken from http://www.w3.org/2000/04/maillog2rdf/imap_sort.py
+# minor bits of code taken from http://www.w3.org/2000/04/maillog2rdf/imap_sort.py
 #
 
 import os
@@ -188,11 +189,24 @@ def _check_result(result, data, msgstr):
         print msgstr+' %s' % data
 	sys.exit(1)
 
-'''Stub to eventually check that a specified string has the grammar of a msgset'''
-def _validMsgset(msgset):
-    ## FIXME: check that msgset is a valid imap messageset string
+def _fixupMsgset(msgset, last):
+    # s/cur/$cur/, s/last/$last/, s/prev/$prev/, s/next/$next/
+    cur= state[state['folder']+'.cur']
+    msgset = msgset.replace('cur', cur)
+    msgset = msgset.replace('last', last)
+    # XXX: bounds-check these?
+    msgset = msgset.replace('next', str(int(cur)+1))
+    msgset = msgset.replace('prev', str(int(cur)-1))
+    return msgset 
+
+'''Stub to check that a specified string has the grammar of a msgset'''
+def _checkMsgset(msgset):
+    ## FIXME: need a better check that msgset is a valid imap messageset string
+    # msgset = int | int:int | int,msgset
     # '1', '1:5', '1,2,3', '1,3:5' are all valid
-    return True
+    if len(msgset.strip('1234567890,:*')) != 0:
+        print "%s isn't a valid messageset. Try again." % msgset
+	sys.exit(1)
 
 
 ''' Work function: changer folders / show current folder'''
@@ -299,9 +313,7 @@ def refile(args):
 	except KeyError:
 	    print "No current message selected."
 	    sys.exit(1)
-    if not _validMsgset(msgset):
-        print "%s isn't a valid messageset. Try again." % msgset
-	sys.exit(1)
+    _checkMsgset(msgset)
     S = _connect()
     result, data = S.select(destfolder)
     if result != 'OK':
@@ -365,9 +377,7 @@ def rmm(args):
 	except KeyError:
 	    print "No current message selected."
 	    sys.exit(1)
-    if not _validMsgset(msgset):
-        print "%s isn't a valid messageset. Try again." % msgset
-	sys.exit(1)
+    _checkMsgset(msgset)
     S = _connect()
     result, data = S.select(state['folder'])
     _check_result(result, data, "Problem changing folders:")
@@ -413,9 +423,7 @@ def show(args):
 	except KeyError:
 	    print "No current message selected."
 	    sys.exit(1)
-    if not _validMsgset(msgset):
-        print "%s isn't a valid messageset. Try again." % msgset
-	sys.exit(1)
+    _checkMsgset(msgset)
     state[folder+'.cur'] = _show(folder, msgset)
 
 '''Work function: show the next message'''
@@ -459,9 +467,7 @@ def scan(args):
     msgset = ' '.join(arglist)
     if not msgset:
         msgset = "1:*"
-    if not _validMsgset(msgset):
-        print "%s isn't a valid messageset. Try again." % msgset
-	sys.exit(1)
+    _checkMsgset(msgset)
     S = _connect()
     result, data = S.select(folder)
     _check_result(result, data, "Problem changing to folder:" )
@@ -503,6 +509,8 @@ def scan(args):
 	    outsubj = "<no subject>"
         if cur == num:
 	    status = '>'
+        elif 'Answered' in flags:
+	    status = 'r'
         elif 'Seen' in flags:
 	    status = ' '
 	elif 'Recent' in flags:
