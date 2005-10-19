@@ -4,9 +4,9 @@
 #
 # Commands that work: folder, folders, scan, rmm, pick/search, rmf
 #
-# Commands to make work: show, next, prev, sort, comp, forw 
+# Commands to make work: sort, comp, forw 
 #
-#   sort may just store a sort order to apply to output instead of
+# * sort will just store a sort order to apply to output instead of
 #   actually touching the mailboxes.
 #
 # some code taken from http://www.w3.org/2000/04/maillog2rdf/imap_sort.py
@@ -28,6 +28,140 @@ def _debug(dstr):
     if Debug > 0:
         print "DEBUG: %s" % dstr
 
+
+PickDocs = """ From RFC2060: 
+      When multiple keys are specified, the result is the intersection
+      (AND function) of all the messages that match those keys.  For
+      example, the criteria DELETED FROM "SMITH" SINCE 1-Feb-1994 refers
+      to all deleted messages from Smith that were placed in the mailbox
+      since February 1, 1994.  A search key can also be a parenthesized
+      list of one or more search keys (e.g. for use with the OR and NOT
+      keys).
+
+      In all search keys that use strings, a message matches the key if
+      the string is a substring of the field.  The matching is case-
+      insensitive.
+
+      The defined search keys are as follows.  Refer to the Formal
+      Syntax section for the precise syntactic definitions of the
+      arguments.
+
+      <message set>  Messages with message sequence numbers
+                     corresponding to the specified message sequence
+                     number set
+
+      ALL            All messages in the mailbox; the default initial
+                     key for ANDing.
+
+      ANSWERED       Messages with the \Answered flag set.
+
+      BCC <string>   Messages that contain the specified string in the
+                     envelope structure's BCC field.
+
+      BEFORE <date>  Messages whose internal date is earlier than the
+                     specified date.
+
+      BODY <string>  Messages that contain the specified string in the
+                     body of the message.
+
+      CC <string>    Messages that contain the specified string in the
+                     envelope structure's CC field.
+
+      DELETED        Messages with the \Deleted flag set.
+
+      DRAFT          Messages with the \Draft flag set.
+
+      FLAGGED        Messages with the \Flagged flag set.
+
+      FROM <string>  Messages that contain the specified string in the
+                     envelope structure's FROM field.
+
+      HEADER <field-name> <string>
+                     Messages that have a header with the specified
+                     field-name (as defined in [RFC-822]) and that
+                     contains the specified string in the [RFC-822]
+                     field-body.
+
+      KEYWORD <flag> Messages with the specified keyword set.
+
+      LARGER <n>     Messages with an [RFC-822] size larger than the
+                     specified number of octets.
+
+      NEW            Messages that have the \Recent flag set but not the
+                     \Seen flag.  This is functionally equivalent to
+                     "(RECENT UNSEEN)".
+
+      NOT <search-key>
+                     Messages that do not match the specified search
+                     key.
+
+      OLD            Messages that do not have the \Recent flag set.
+                     This is functionally equivalent to "NOT RECENT" (as
+                     opposed to "NOT NEW").
+
+      ON <date>      Messages whose internal date is within the
+                     specified date.
+
+      OR <search-key1> <search-key2>
+                     Messages that match either search key.
+
+      RECENT         Messages that have the \Recent flag set.
+
+      SEEN           Messages that have the \Seen flag set.
+
+      SENTBEFORE <date>
+                     Messages whose [RFC-822] Date: header is earlier
+                     than the specified date.
+
+      SENTON <date>  Messages whose [RFC-822] Date: header is within the
+                     specified date.
+
+      SENTSINCE <date>
+                     Messages whose [RFC-822] Date: header is within or
+                     later than the specified date.
+
+      SINCE <date>   Messages whose internal date is within or later
+                     than the specified date.
+
+      SMALLER <n>    Messages with an [RFC-822] size smaller than the
+                     specified number of octets.
+
+      SUBJECT <string>
+                     Messages that contain the specified string in the
+                     envelope structure's SUBJECT field.
+
+      TEXT <string>  Messages that contain the specified string in the
+                     header or body of the message.
+
+      TO <string>    Messages that contain the specified string in the
+                     envelope structure's TO field.
+
+      UID <message set>
+                     Messages with unique identifiers corresponding to
+                     the specified unique identifier set.
+
+      UNANSWERED     Messages that do not have the \Answered flag set.
+
+      UNDELETED      Messages that do not have the \Deleted flag set.
+
+      UNDRAFT        Messages that do not have the \Draft flag set.
+
+      UNFLAGGED      Messages that do not have the \Flagged flag set.
+
+      UNKEYWORD <flag>
+                     Messages that do not have the specified keyword
+                     set.
+
+      UNSEEN         Messages that do not have the \Seen flag set.
+
+"""
+
+
+
+'''
+   parse the args into a folder-spec (denoted by a leading +, last of
+   which is used if multiple are listed), and the rest of the args
+'''
 def _argFolder(args):
     folder = None
     outargs = []
@@ -38,29 +172,35 @@ def _argFolder(args):
 	    outargs.append(a)
     return folder, outargs
 
+''' Convenience connection creation function
+    FIXME: handle IMAP-SSL
+    FIXME: parse a url-ish imap[s]://server:port/ for the server/port/ssl spec
+'''
 def _connect():
     session = imaplib.IMAP4(config['server'],int(config['port']))
     session.debug = Debug
     session.login(config['user'], config['password'])
     return session
 
+''' Convenience exit-on-error wrapper '''
 def _check_result(result, data, msgstr):
     if result != 'OK':
         print msgstr+' %s' % data
 	sys.exit(1)
 
+'''Stub to eventually check that a specified string has the grammar of a msgset'''
 def _validMsgset(msgset):
     ## FIXME: check that msgset is a valid imap messageset string
     # '1', '1:5', '1,2,3', '1,3:5' are all valid
     return True
 
 
+''' Work function: changer folders / show current folder'''
 def folder(args):
-    if not args:
+    folder, arglist = _argFolder(args)
+    if not folder:
         folder = state['folder']
-    elif len(args) == 1:
-        folder = args[0][1:]
-    else:
+    if arglist:
         print "Usage:  folder +<foldername>"
 	sys.exit(1)
     S = _connect()
@@ -77,11 +217,16 @@ def folder(args):
     S.logout()
     if result == 'OK':
         state['folder'] = folder
-        print "Current folder is now %s (%s messages)" % (folder, data[0])
+	# inbox+ has 64 messages  (1-64); cur=63; (others).
+	cur = state[folder+'.cur']
+	if cur is None:
+	   cur = 'unset'
+        print "Folder %s has %s messages, cur is %s." % (folder, data[0], cur)
     else:
         print "Failed to set folder to '%s': %s" % (folder, data)
 
 
+''' Work function: show all folder'''
 def folders(args):
     S = _connect()
     result, data = S.list()
@@ -111,11 +256,14 @@ def folders(args):
 	    totalnew += int(unseen)
     print "TOTAL: %d messages (%d new) in %d folders" % (totalmsgs, totalnew, len(folderlist))
 
-
+'''Work function: return a message-set that matches the search criteria.
+   Criteria are based on the IMAP-spec search string.
+'''
 def pick(args):
     if not args:
         print "Usage: pick <search criteria>"
 	print "    returns a message-set that matches search criteria"
+        print PickDocs
         sys.exit(1)
     folder, arglist = _argFolder(args)
     if folder:
@@ -134,10 +282,11 @@ def pick(args):
     print ','.join(msglist)
 
 
+'''Work function:  moves a set of messages from the current folder to a new one.'''
 def refile(args):
     if not args:
         print "Usage: refile <messageset> +<folder>"
-	print "    returns a message-set that matches search criteria"
+	print "    moves a set of messages from the current folder to a new one."
         sys.exit(1)
     destfolder, arglist = _argFolder(args)
     if not destfolder:
@@ -176,7 +325,7 @@ def refile(args):
     S.logout()
     print "Done."
 
-
+'''Work function: remove a folder'''
 def rmf(args):
     if len(args) == 1:
         folder = args[0][1:]
@@ -199,7 +348,7 @@ def rmf(args):
     else:
         print "Failed to set folder to '%s': %s" % (folder, data)
 
-
+'''Work function: remove messages from a folder'''
 def rmm(args):
     if len(args) < 1:
         print "Usage: rmm [+folder] <messageset>"
@@ -209,7 +358,7 @@ def rmm(args):
     folder, arglist = _argFolder(args)
     if folder:
         state['folder'] = folder
-    msgset = ' '.join(args)
+    msgset = ' '.join(arglist)
     if not msgset:
         try:
             msgset = state[state['folder']+'.cur']
@@ -234,45 +383,79 @@ def rmm(args):
     S.logout()
     state[state['folder']+'.cur'] = first
 
-
-def show(args):
-    folder, arglist = _argFolder(args)
-    if folder:
-        state['folder'] = folder
-    msgset = ' '.join(args)
-    if not msgset:
-        try:
-            msgset = state[state['folder']+'.cur']
-	except KeyError:
-	    print "No current message selected."
-	    sys.exit(1)
-    if not _validMsgset(msgset):
-        print "%s isn't a valid messageset. Try again." % msgset
-	sys.exit(1)
+'''common code for show/next/prev'''
+def _show(folder, msgset):
     S = _connect()
-    result, data = S.select(state['folder'])
+    result, data = S.select(folder)
     _check_result(result, data, "Problem changing folders:")
     result, data = S.search(None, msgset)
     _check_result(result, data, "Problem with search:")
     last = None
     for num in data[0].split():
         result, data = S.fetch(num, '(RFC822)')
-	print "(Message %s:%s)\n%s\n" % (state['folder'], num, data[0][1])
+	print "(Message %s:%s)\n%s\n" % (folder, num, data[0][1])
         last = num
     S.close()
     S.logout()
-    state[state['folder']+'.cur'] = last
+    return last
 
 
-def scan(args):
-    subjlen = 50
-    if len(args) > 99:
-        print "Usage: scan [+folder] [range]"
-	sys.exit(1)
-    # find any folder refs and put together the msgset string
+'''Work function: show the current message'''
+def show(args):
     folder, arglist = _argFolder(args)
     if folder:
         state['folder'] = folder
+    folder = state['folder']
+    msgset = ' '.join(arglist)
+    if not msgset:
+        try:
+            msgset = state[folder+'.cur']
+	except KeyError:
+	    print "No current message selected."
+	    sys.exit(1)
+    if not _validMsgset(msgset):
+        print "%s isn't a valid messageset. Try again." % msgset
+	sys.exit(1)
+    state[folder+'.cur'] = _show(folder, msgset)
+
+'''Work function: show the next message'''
+# TODO: needs better bounds checking
+def next(args):
+    folder, arglist = _argFolder(args)
+    if folder:
+        state['folder'] = folder
+    folder = state['folder']
+    try:
+        cur = int(state[folder+'.cur']) + 1
+    except KeyError:
+        cur = 1
+    state[folder+'.cur'] = _show(folder, str(cur))
+
+
+'''Work function: show the previous message'''
+# TODO: needs better bounds checking
+def prev(args):
+    folder, arglist = _argFolder(args)
+    if folder:
+        state['folder'] = folder
+    folder = state['folder']
+    try:
+        cur = int(state[folder+'.cur']) - 1
+    except KeyError:
+        cur = 1
+    state[folder+'.cur'] = _show(folder, str(cur))
+
+'''Work function: show a list of messages'''
+def scan(args):
+    subjlen = 50
+    if len(args) > 99:
+        print "Usage: scan [+folder] [messageset]"
+	sys.exit(1)
+    # find any folder refs and put together the msgset string
+    folder, arglist = _argFolder(args)
+    if not folder:
+        folder = state['folder']
+    state['folder'] = folder
     msgset = ' '.join(arglist)
     if not msgset:
         msgset = "1:*"
@@ -280,10 +463,9 @@ def scan(args):
         print "%s isn't a valid messageset. Try again." % msgset
 	sys.exit(1)
     S = _connect()
-    result, data = S.select(state['folder'])
+    result, data = S.select(folder)
     _check_result(result, data, "Problem changing to folder:" )
-    # FIXME: check here that we changed into the folder correctly
-    result, data = S.fetch(msgset, 'ENVELOPE')
+    result, data = S.fetch(msgset, '(ENVELOPE FLAGS)')
     _debug('result: %s' % repr(result))
     _debug('data: %s' % repr(data))
     _check_result(result, data, "Problem with fetch:" )
@@ -291,7 +473,7 @@ def scan(args):
         print "No messages."
 	sys.exit(0)
     try:
-        cur = string.atoi(state[state['folder']+'.cur'])
+        cur = string.atoi(state[folder+'.cur'])
     except:
         cur = None
     for hit in data:
@@ -299,11 +481,15 @@ def scan(args):
         num, e = hit.split(' ',1)
         num = string.atoi(num)
 	e = readlisp(e)
+	#_debug("e: %s" % repr(e))
         env_date, env_subject, env_from, env_sender = e[1][:4]
+	flags = [str(f) for f in e[3]]
 	_debug("env_date: %s" % repr(env_date))
 	_debug("env_subject: %s" % repr(env_subject))
 	_debug("env_from: %s" % repr(env_from))
 	_debug("env_sender: %s" % repr(env_sender))
+	_debug("flags: %s" % repr(flags))
+	_debug("flags[0]: %s" % repr(flags[0]))
 	try:
 	    dt = time.strptime(' '.join(str(env_date).split()[:5]), "%a, %d %b %Y %H:%M:%S ")
 	    outtime = time.strftime("%m/%d", dt)
@@ -312,18 +498,19 @@ def scan(args):
         outfrom = str(env_from[0][0])
 	if outfrom == 'NIL':
 	    outfrom = "%s@%s" % (env_from[0][2], env_from[0][3])
-	if len(outfrom) > 18: outfrom = outfrom[:18]
 	outsubj = str(env_subject)
 	if outsubj == 'NIL':
 	    outsubj = "<no subject>"
-	if len(outsubj) > subjlen:
-	    outsubj = outsubj[:subjlen]
         if cur == num:
-	    status = '+'
-	else:
+	    status = '>'
+        elif 'Seen' in flags:
 	    status = ' '
-        outline = '%4s%s %s %-18s '% (num, status, outtime, outfrom)
-	print outline + outsubj
+	elif 'Recent' in flags:
+	    status = 'N'
+	else:
+	    status = 'O'
+        outline = '%4s %s %s %-18s '% (num, status, outtime, outfrom[:18])
+	print outline + outsubj[:subjlen]
     S.close()
     S.logout()
 
@@ -343,6 +530,8 @@ Commands = { 'folders': folders,
              'scan': scan,
              'search': pick,
              'show': show,
+             'next': next,
+             'prev': prev,
            }
 
 
