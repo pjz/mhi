@@ -317,7 +317,7 @@ def refile(args):
     S = _connect()
     result, data = S.select(destfolder)
     if result != 'OK':
-        print "Folder '%s' doesn't exist.  Create it? ",
+        print "Folder '%s' doesn't exist.  Create it? " % destfolder,
 	answer = sys.stdin.readline().strip().lower()
 	if len(answer) > 0 and answer[0] == 'y':
 	    result, data = S.create(destfolder)
@@ -328,12 +328,16 @@ def refile(args):
         _check_result(result, data, "Problem with copy:")
         result, data = S.search(None, msgset)
         _check_result(result, data, "Problem with search:")
-        for num in data[0].split():
+	print "Refiling... ",
+	msgnums = data[0].split()
+        for num in msgnums:
             S.store(num, '+FLAGS', '\\Deleted')
+	    print ".", 
         S.expunge()
+	print "%d messages refiled to '%s'." % (len(msgnums), destfolder)
+        S.close()
     else:
         print "Aborting refile: %s" % data
-    S.close()
     S.logout()
     print "Done."
 
@@ -495,7 +499,7 @@ def scan(args):
 	_debug("env_from: %s" % repr(env_from))
 	_debug("env_sender: %s" % repr(env_sender))
 	_debug("flags: %s" % repr(flags))
-	_debug("flags[0]: %s" % repr(flags[0]))
+	#_debug("flags[0]: %s" % repr(flags[0]))
 	try:
 	    dt = time.strptime(' '.join(str(env_date).split()[:5]), "%a, %d %b %Y %H:%M:%S ")
 	    outtime = time.strftime("%m/%d", dt)
@@ -550,22 +554,23 @@ def _dispatch(args):
         bar.sort()
         return bar
 
-    try:
-        _debug("args: %s" % repr(args))
+    _debug("args: %s" % repr(args))
+    if len(args) > 1:
         cmd = args[1]
         _debug("cmd: %s" % cmd)
         cmdargs = args[2:]
         _debug("cmdargs: %s" % cmdargs)
         _debug("commands: %s" % Commands)
-        cmdfunc = Commands[cmd]
-        _debug("cmdfunc: %s" % cmdfunc)
-        cmdfunc(cmdargs)
-        config.write()
-        state.write()
-    except IndexError:
+        cmdfunc = Commands.get(cmd,None)
+	if cmdfunc:
+            _debug("cmdfunc: %s" % cmdfunc)
+            cmdfunc(cmdargs)
+            config.write()
+            state.write()
+        else:        
+            print "Unknown command %s.  Valid ones: %s " % (sys.argv[1], ', '.join(_sort(Commands.keys())))
+    else:
         print "Must specify a command.  Valid ones: %s " % ', '.join(_sort(Commands.keys()))
-    except KeyError:
-        print "Unknown command %s.  Valid ones: %s " % (sys.argv[1], ', '.join(_sort(Commands.keys())))
 
 # main program
 
