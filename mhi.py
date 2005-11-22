@@ -182,11 +182,25 @@ def _connect():
                 'imaps': imaplib.IMAP4_SSL, 
                 'stream': imaplib.IMAP4_stream }
     scheme, netloc, path, _, _, _ = urlparse.urlparse(config['connection'])
+    _debug('scheme: %s netloc: %s path: %s' % (scheme, netloc, path))
     if netloc:
-        uph, port = netloc.rsplit(':', 1)
-        userpass, host = uph.rsplit('@', 1)
+	if '@' in netloc:
+            userpass, hostport = netloc.rsplit('@', 1)
+	else:
+	    userpass, hostport = netloc, 'localhost'
+	if ':' in hostport:
+            host, port = hostport.rsplit(':', 1)
+	else:
+	    host = hostport
+            port = "143"
+            if scheme[-1] == 's':
+                port = "993"
+	if ':' in userpass:
+            user, passwd = userpass.split(':', 1)
+	else:
+	    user, passwd = os.environ.get('USER',''), userpass
+        _debug("%s connection to %s : %s @ %s : %s" % (scheme, user, passwd, host, port))
         session = schemes[scheme](host, int(port))
-        user, passwd = userpass.split(':', 1)
         session.login(user, passwd)
     else:
         session = schemes[scheme](path)
