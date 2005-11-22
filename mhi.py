@@ -231,7 +231,7 @@ def _edit(msgfile):
 def _SMTPsend(msgfile):
     import smtplib
     import email
-    ret = {'Unknown', 'SMTP problem'}
+    ret = {'Unknown':'SMTP problem'}
     msg = email.message_from_file(file(msgfile,"r"))
     fromaddr = msg.get('From','')
     toaddrs = msg.get_all('To',[])
