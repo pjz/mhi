@@ -772,7 +772,7 @@ class ConfigObj(Section):
                 if self.create_empty:
                     # this is a good test that the filename specified
                     # isn't impossible - like on a non existent device
-                    h = open(self.filename)
+                    h = open(self.filename,'w')
                     h.write('')
                     h.close()
                 infile = []
