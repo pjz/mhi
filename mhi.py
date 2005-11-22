@@ -4,7 +4,7 @@
 #
 # Commands that work: folder, folders, scan, rmm, pick/search, rmf
 #
-# Commands to make work: sort, comp, forw 
+# Commands to make work: sort, comp, repl, dist, forw, anno
 #
 # * sort should just store a sort order to apply to output instead of
 #   actually touching the mailboxes.  This will affect the working of
@@ -21,8 +21,9 @@ import imaplib
 from configobj import ConfigObj
 from readlisp import readlisp
 
-config = ConfigObj("/home/pj/.mhirc",create_empty=True )
-state = ConfigObj("/home/pj/.mhistate",create_empty=True )
+cfgdir=os.environ.get('HOME','')
+config = ConfigObj("%s/.mhirc" % cfgdir,create_empty=True )
+state = ConfigObj("%s/.mhistate" % cfgdir,create_empty=True )
 Debug = 0
 
 def _debug(dstr):
@@ -158,7 +159,6 @@ PickDocs = """ From RFC2060:
 """
 
 
-
 '''
    parse the args into a folder-spec (denoted by a leading +, last of
    which is used if multiple are listed), and the rest of the args
@@ -207,6 +207,77 @@ def _checkMsgset(msgset):
     if len(msgset.strip('1234567890,:*')) != 0:
         print "%s isn't a valid messageset. Try again." % msgset
 	sys.exit(1)
+
+def _crlf_terminate(msgfile):
+    tfile = os.tempnam()
+    os.rename(msgfile,tfile)
+    inf = file(tfile,"r")
+    outf = file(msgfile,"w")
+    for line in inf:
+        if len(line) >= 2 and line[-2] != '\r' and line[-1] == '\n':
+	   line = line[:-1]+'\r\n'
+	   outf.write(line)
+    inf.close()
+    outf.close()
+
+''' internal common code for comp/repl/dist/medit '''
+def _edit(msgfile):
+    env = os.environ
+    editor = env.get('VISUAL',env.get('EDITOR', 'editor'))
+    fin = os.system("%s %s" % (editor, msgfile))
+    _crlf_terminate(msgfile)
+    return fin
+
+def _SMTPsend(msgfile):
+    import smtplib
+    import email
+    ret = {'Unknown', 'SMTP problem'}
+    msg = email.message_from_file(file(msgfile,"r"))
+    fromaddr = msg.get('From','')
+    toaddrs = msg.get_all('To',[])
+    server = smtplib.SMTP('localhost')
+    #server.set_debuglevel(1)
+    try:
+        ret = server.sendmail(fromaddr, toaddrs, msg.as_string())
+    except smtplib.SMTPRecipientsRefused:
+        print "No valid recipients. Try again."
+    except smtplib.SMTPHeloError:
+        print "Error talking to SMTP server (No HELO)."
+    except smtplib.SMTPSenderRefused:
+        print "Error talking to SMTP server (Unacceptable FROM address)."
+    except smtplib.SMTPDataError:
+        print "Error talking to SMTP server (Data Error)."
+    server.quit()
+    for k in ret.keys():
+        print "SMTP Error: %s: %s" % (k, ret[k])
+    return len(ret.keys())
+
+''' Work function: compose a new message '''
+def comp(args):
+    tmpfile = os.tempnam(None,'mhi-comp-')
+    ret = _edit(tmpfile)
+    if ret == 0:
+        # edit succeeded, wasn't aborted or anything 
+        errcount = _SMTPsend(tmpfile)
+	if not errcount:
+            os.unlink(tmpfile)
+    else:
+        # 'abort - throw away session, keep - save it for later'
+	print "Session aborted."
+        os.unlink(tmpfile)
+
+
+def repl(args):
+    tmpfile = os.tempnam(None,'mhi-repl-')
+    # put quoted contents of current message into tmpfile
+    ret = _edit(tmpfile)
+    if ret == 0:
+        # edit succeeded, wasn't aborted or anything 
+        _SMTPsend(tmpfile)
+    else:
+        # 'abort - throw away session, keep - save it for later'
+	pass
+
 
 
 ''' Work function: changer folders / show current folder'''
@@ -264,7 +335,11 @@ def folders(args):
         _debug("  Stats: %s " % repr(foo))
         #_debug("Statsrl: %s " % repr(readlisp(foo)))
         messages, recent, unseen = foo[1], foo[3], foo[5]
-        print "%s%-10s %10s %6s %6s" % (iscur, folder, messages, recent, unseen)
+	cur = state.get(folder+'.cur', None)
+	if cur is None:
+	    if folder == 'FOLDER': cur = 'CUR'
+	    else: cur = '-'
+        print "%s%-20s %7s %7s %7s %7s" % (iscur, folder, cur, messages, recent, unseen)
 	if folder != 'FOLDER':
             totalmsgs += int(messages)
 	    totalnew += int(unseen)
@@ -544,6 +619,7 @@ Commands = { 'folders': folders,
              'show': show,
              'next': next,
              'prev': prev,
+             'comp': comp,
            }
 
 
