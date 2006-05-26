@@ -11,7 +11,9 @@
 #   anything that takes a msgset as well as scan, next, prev, and pick
 #
 # minor bits of code taken from http://www.w3.org/2000/04/maillog2rdf/imap_sort.py
-#
+# everything else Copyright Paul Jimenez, released under the GPL
+# canonical copy at http://www.place.org/~pj/software/mhi
+
 
 import os
 import sys
@@ -590,8 +592,8 @@ def scan(args):
         _debug('Hit: %s' % (repr(hit)))
         num, e = hit.split(' ',1)
         num = string.atoi(num)
+        _debug("e: %s" % repr(e))
         e = readlisp(e)
-        #_debug("e: %s" % repr(e))
         env_date, env_subject, env_from, env_sender = e[1][:4]
         flags = [str(f) for f in e[3]]
         _debug("env_date: %s" % repr(env_date))
