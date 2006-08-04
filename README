@@ -2,7 +2,7 @@
 MHI
 ---
 
-mhi is a comamndline style mailread in the tradition of mh and
+mhi is a comamndline style mailreader in the tradition of mh and
 nmh, but mutated to support IMAP.  
 
 Why?
