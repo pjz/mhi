@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2.4
 #
 # Goal: MH-ish commands that will talk to an IMAP server
 #
@@ -330,7 +330,7 @@ def folder(args):
     if result == 'OK':
         state['folder'] = folder
         # inbox+ has 64 messages  (1-64); cur=63; (others).
-        cur = state[folder+'.cur']
+        cur = state.get(folder+'.cur', None)
         if cur is None:
            cur = 'unset'
         print "Folder %s has %s messages, cur is %s." % (folder, data[0], cur)
