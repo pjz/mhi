@@ -18,10 +18,11 @@
 import os
 import sys
 import time
+import sexpr
 import string
 import imaplib
+import StringIO
 from configobj import ConfigObj
-from readlisp import readlisp
 
 cfgdir=os.environ.get('HOME','')
 config = ConfigObj(infile="%s/.mhirc" % cfgdir, create_empty=True)
@@ -31,6 +32,9 @@ Debug = 0
 def _debug(dstr):
     if Debug > 0:
         print "DEBUG: %s" % dstr
+
+def readsexpr(s):
+    return sexpr.SexprParser(StringIO.StringIO(s)).parse()    
 
 
 PickDocs = """ From RFC2060: 
@@ -215,11 +219,20 @@ def _check_result(result, data, msgstr):
         print msgstr+' %s' % data
         sys.exit(1)
 
+def do_or_die(func, errormsg):
+    result, data = func
+    if result != 'OK':
+        print msgstr+' %s' % data
+        sys.exit(1)
+    return result, data
+
 def _fixupMsgset(msgset, last):
     # s/cur/$cur/, s/last/$last/, s/prev/$prev/, s/next/$next/
+    msgset = msgset.replace('-', ':')
     cur= state[state['folder']+'.cur']
     msgset = msgset.replace('cur', cur)
     msgset = msgset.replace('last', last)
+    msgset = msgset.replace('$', last)
     # XXX: bounds-check these?
     msgset = msgset.replace('next', str(int(cur)+1))
     msgset = msgset.replace('prev', str(int(cur)-1))
@@ -228,7 +241,7 @@ def _fixupMsgset(msgset, last):
 '''Stub to check that a specified string has the grammar of a msgset'''
 def _checkMsgset(msgset):
     ## FIXME: need a better check that msgset is a valid imap messageset string
-    # msgset = int | int:int | int,msgset
+    # msgset = int | int:int | msgset,msgset
     # '1', '1:5', '1,2,3', '1,3:5' are all valid
     if len(msgset.strip('1234567890,:*')) != 0:
         print "%s isn't a valid messageset. Try again." % msgset
@@ -346,9 +359,9 @@ def folders(args):
     _debug(" flist: %s " % repr(flist))
     stats = {}
     for fline in flist:
-        f = str(readlisp('('+fline+')')[2])
+        f = str(readsexpr('('+fline+')')[2])
         _debug(" f: %s " % repr(f))
-        stats[f] = readlisp('('+S.status(f, '(MESSAGES RECENT UNSEEN)')[1][0]+')')[1]
+        stats[f] = readsexpr('('+S.status(f, '(MESSAGES RECENT UNSEEN)')[1][0]+')')[1]
     S.logout()
     stats["FOLDER"] = [0, "# MESSAGES", 0, "RECENT", 0, "UNSEEN"]
     folderlist = [ key for key in stats.keys() if key != 'FOLDER' ]
@@ -360,7 +373,7 @@ def folders(args):
         if folder == state['folder']: iscur = '*'
         foo = stats[folder]
         _debug("  Stats: %s " % repr(foo))
-        #_debug("Statsrl: %s " % repr(readlisp(foo)))
+        #_debug("Statsrl: %s " % repr(readsexpr(foo)))
         messages, recent, unseen = foo[1], foo[3], foo[5]
         cur = state.get(folder+'.cur', None)
         if cur is None:
@@ -390,12 +403,17 @@ def pick(args):
     _check_result(result, data, "Problem changing to folder:")
     result, data = S.search(None, searchstr)
     _check_result(result, data, "Problem with search criteria:")
+    _debug("data: %s" % repr(data))
     S.close()
     S.logout()
-    msglist = []
-    for m in data:
-        msglist += m.split()
-    print ','.join(msglist)
+    data = [d for d in data if d != '']
+    if data:
+        msglist = []
+        for m in data:
+            msglist += m.split()
+        print ','.join(msglist)
+    else:
+        print "0"
 
 
 '''Work function:  moves a set of messages from the current folder to a new one.'''
@@ -411,7 +429,7 @@ def refile(args):
     msgset = ' '.join(arglist)
     if not msgset:
         try:
-            msgset = state[folder+".cur"]
+            msgset = state[state["folder"]+".cur"]
         except KeyError:
             print "No current message selected."
             sys.exit(1)
@@ -577,11 +595,15 @@ def scan(args):
     S = _connect()
     result, data = S.select(folder)
     _check_result(result, data, "Problem changing to folder:" )
-    result, data = S.fetch(msgset, '(ENVELOPE FLAGS)')
+    try:
+        result, data = S.fetch(msgset, '(ENVELOPE FLAGS)')
+    except: pass
     _debug('result: %s' % repr(result))
     _debug('data: %s' % repr(data))
     _check_result(result, data, "Problem with fetch:" )
-    if data[0] is None:
+    # take out fake/ba hits
+    data = [ hit for hit in data if ' ' in hit ]
+    if data == [] or data[0] is None:
         print "No messages."
         sys.exit(0)
     try:
@@ -593,7 +615,7 @@ def scan(args):
         num, e = hit.split(' ',1)
         num = string.atoi(num)
         _debug("e: %s" % repr(e))
-        e = readlisp(e)
+        e = readsexpr(e)
         env_date, env_subject, env_from, env_sender = e[1][:4]
         flags = [str(f) for f in e[3]]
         _debug("env_date: %s" % repr(env_date))
@@ -667,7 +689,9 @@ def _dispatch(args):
         cmdfunc = Commands.get(cmd,None)
         if cmdfunc:
             _debug("cmdfunc: %s" % cmdfunc)
-            cmdfunc(cmdargs)
+	    try:
+                cmdfunc(cmdargs)
+	    except IOError: pass
             config.write()
             state.write()
         else:        
