@@ -18,7 +18,6 @@
 import os
 import sys
 import time
-import sexpr
 import string
 import imaplib
 import StringIO
@@ -33,9 +32,15 @@ def _debug(dstr):
     if Debug > 0:
         print "DEBUG: %s" % dstr
 
-def readsexpr(s):
+def sexpr_readsexpr(s):
+    import sexpr
     return sexpr.SexprParser(StringIO.StringIO(s)).parse()    
 
+def readlisp_readsexpr(s):
+    import readlisp
+    return readlisp.readlisp(s)
+
+readsexpr = readlisp_readsexpr
 
 PickDocs = """ From RFC2060: 
       When multiple keys are specified, the result is the intersection
@@ -292,8 +297,9 @@ def _SMTPsend(msgfile):
         print "SMTP Error: %s: %s" % (k, ret[k])
     return len(ret.keys())
 
-''' Work function: compose a new message '''
+
 def comp(args):
+    '''Compose a new message'''
     tmpfile = os.tempnam(None,'mhi-comp-')
     ret = _edit(tmpfile)
     if ret == 0:
@@ -308,6 +314,7 @@ def comp(args):
 
 
 def repl(args):
+    '''Reply to the current message, quoting it'''
     tmpfile = os.tempnam(None,'mhi-repl-')
     # put quoted contents of current message into tmpfile
     ret = _edit(tmpfile)
@@ -319,9 +326,8 @@ def repl(args):
         pass
 
 
-
-''' Work function: changer folders / show current folder'''
 def folder(args):
+    ''' Change folders / show current folder'''
     folder, arglist = _argFolder(args)
     if not folder:
         folder = state['folder']
@@ -351,8 +357,8 @@ def folder(args):
         print "Failed to set folder to '%s': %s" % (folder, data)
 
 
-''' Work function: show all folder'''
 def folders(args):
+    ''' Show all folders'''
     S = _connect()
     result, data = S.list()
     flist = data
@@ -385,13 +391,15 @@ def folders(args):
             totalnew += int(unseen)
     print "TOTAL: %d messages (%d new) in %d folders" % (totalmsgs, totalnew, len(folderlist))
 
-'''Work function: return a message-set that matches the search criteria.
-   Criteria are based on the IMAP-spec search string.
-'''
+
 def pick(args):
+    '''Usage: pick <search criteria>
+    Return a message-set that matches the search criteria.
+    Criteria are based on the IMAP spec search string.
+    A summary of the IMAP spec is available by calling 'pick' with no options.
+    '''
     if not args:
-        print "Usage: pick <search criteria>"
-        print "    returns a message-set that matches search criteria"
+        print pick.__doc__
         print PickDocs
         sys.exit(1)
     folder, arglist = _argFolder(args)
@@ -416,11 +424,12 @@ def pick(args):
         print "0"
 
 
-'''Work function:  moves a set of messages from the current folder to a new one.'''
 def refile(args):
+    '''Usage: refile <messageset> +<folder>
+    Moves a set of messages from the current folder to a new one.
+    '''
     if not args:
-        print "Usage: refile <messageset> +<folder>"
-        print "    moves a set of messages from the current folder to a new one."
+        print refile.__doc__
         sys.exit(1)
     destfolder, arglist = _argFolder(args)
     if not destfolder:
@@ -461,12 +470,14 @@ def refile(args):
     S.logout()
     print "Done."
 
-'''Work function: remove a folder'''
 def rmf(args):
+    '''Usage:  rmf +<foldername>
+    remove a folder
+    '''
     if len(args) == 1:
         folder = args[0][1:]
     else:
-        print "Usage:  rmf +<foldername>"
+        print rmf.__doc__
         sys.exit(1)
     S = _connect()
     result, data = S.select(folder)
@@ -484,12 +495,15 @@ def rmf(args):
     else:
         print "Failed to set folder to '%s': %s" % (folder, data)
 
-'''Work function: remove messages from a folder'''
 def rmm(args):
+    '''Usage: rmm [+folder] <messageset>
+    ie: rmm +INBOX 1
+    ie: rmm 1:5
+
+    remove messages from a folder
+    '''
     if len(args) < 1:
-        print "Usage: rmm [+folder] <messageset>"
-        print "   ie: rmm +INBOX 1"
-        print "   ie: rmm 1:5"
+        print rmm.__doc__
         sys.exit(1)
     folder, arglist = _argFolder(args)
     if folder:
@@ -517,8 +531,8 @@ def rmm(args):
     S.logout()
     state[state['folder']+'.cur'] = first
 
-'''common code for show/next/prev'''
 def _show(folder, msgset):
+    '''common code for show/next/prev'''
     S = _connect()
     result, data = S.select(folder)
     _check_result(result, data, "Problem changing folders:")
@@ -534,8 +548,10 @@ def _show(folder, msgset):
     return last
 
 
-'''Work function: show the current message'''
 def show(args):
+    '''Usage:  show <messageset>
+    show the specified messages, or the current message
+    '''
     folder, arglist = _argFolder(args)
     if folder:
         state['folder'] = folder
@@ -550,9 +566,11 @@ def show(args):
     _checkMsgset(msgset)
     state[folder+'.cur'] = _show(folder, msgset)
 
-'''Work function: show the next message'''
 # TODO: needs better bounds checking
 def next(args):
+    '''Usage: next [+<folder>]
+    Show the next message in the specified folder, or the current folder if not specified
+    '''
     folder, arglist = _argFolder(args)
     if folder:
         state['folder'] = folder
@@ -563,10 +581,11 @@ def next(args):
         cur = 1
     state[folder+'.cur'] = _show(folder, str(cur))
 
-
-'''Work function: show the previous message'''
 # TODO: needs better bounds checking
 def prev(args):
+    '''Usage: prev [+<folder>]
+    Show the previous message in the specified folder, or the current folder if not specified
+    '''
     folder, arglist = _argFolder(args)
     if folder:
         state['folder'] = folder
@@ -577,11 +596,14 @@ def prev(args):
         cur = 1
     state[folder+'.cur'] = _show(folder, str(cur))
 
-'''Work function: show a list of messages'''
 def scan(args):
+    '''Usage: scan [+<folder>] [messageset]
+    Show a list of the specified messages (or all if unspecified)
+    in the specified folder, or the current folder if not specified
+    '''
     subjlen = 50
     if len(args) > 99:
-        print "Usage: scan [+folder] [messageset]"
+        print scan.__doc__
         sys.exit(1)
     # find any folder refs and put together the msgset string
     folder, arglist = _argFolder(args)
@@ -656,6 +678,27 @@ def debug(args):
     Debug = 4    
     _dispatch([sys.argv[0]]+args) 
 
+def help(args):
+    '''Usage: help <command>
+    Shows help on the specified command.
+    '''
+
+    def _sort(foo):
+        bar = foo
+        bar.sort()
+        return bar
+
+    if len(args) < 1:
+        print help.__doc__
+        print "Valid commands: %s " % (', '.join(_sort(Commands.keys())))
+        sys.exit(0)
+    else:
+        cmd = args[0]
+        cmdfunc = Commands.get(cmd, None)
+        print "Help on %s:\n" % cmd
+        print cmdfunc.__doc__
+
+
 Commands = { 'folders': folders,
              'folder': folder,
              'debug': debug,
@@ -669,6 +712,7 @@ Commands = { 'folders': folders,
              'next': next,
              'prev': prev,
              'comp': comp,
+             'help': help,
            }
 
 
