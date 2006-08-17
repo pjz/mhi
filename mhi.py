@@ -2,7 +2,8 @@
 #
 # Goal: MH-ish commands that will talk to an IMAP server
 #
-# Commands that work: folder, folders, scan, rmm, pick/search, rmf
+# Commands that work: folder, folders, scan, rmm, rmf, pick/search, help,
+#                     debug, refile, show, next, prev
 #
 # Commands to make work: sort, comp, repl, dist, forw, anno
 #
@@ -170,11 +171,11 @@ PickDocs = """ From RFC2060:
 """
 
 
-'''
-   parse the args into a folder-spec (denoted by a leading +, last of
-   which is used if multiple are listed), and the rest of the args
-'''
 def _argFolder(args):
+    '''
+    parse the args into a folder-spec (denoted by a leading +, last of
+    which is used if multiple are listed), and the rest of the args
+    '''
     folder = None
     outargs = []
     for a in args:
@@ -184,10 +185,9 @@ def _argFolder(args):
             outargs.append(a)
     return folder, outargs
 
-''' Convenience connection creation function
-'''
 
 def _connect():
+    ''' Convenience connection creation function '''
     import urlparse
     schemes = { 'imap' : imaplib.IMAP4, 
                 'imaps': imaplib.IMAP4_SSL, 
@@ -252,8 +252,8 @@ def _checkMsgset(msgset):
         print "%s isn't a valid messageset. Try again." % msgset
         sys.exit(1)
 
-''' convenience function to turn a \n terminated file into a \r\n terminated file '''
 def _crlf_terminate(msgfile):
+    ''' convenience function to turn a \n terminated file into a \r\n terminated file '''
     tfile = os.tempnam()
     os.rename(msgfile,tfile)
     inf = file(tfile,"r")
@@ -265,8 +265,8 @@ def _crlf_terminate(msgfile):
     inf.close()
     outf.close()
 
-''' internal common code for comp/repl/dist/medit '''
 def _edit(msgfile):
+    ''' internal common code for comp/repl/dist/medit '''
     env = os.environ
     editor = env.get('VISUAL',env.get('EDITOR', 'editor'))
     fin = os.system("%s %s" % (editor, msgfile))
@@ -299,7 +299,10 @@ def _SMTPsend(msgfile):
 
 
 def comp(args):
-    '''Compose a new message'''
+    '''Usage: comp
+    
+    Compose a new message
+    '''
     tmpfile = os.tempnam(None,'mhi-comp-')
     ret = _edit(tmpfile)
     if ret == 0:
@@ -314,7 +317,10 @@ def comp(args):
 
 
 def repl(args):
-    '''Reply to the current message, quoting it'''
+    '''Usage: repl
+    
+    Reply to the current message, quoting it
+    '''
     tmpfile = os.tempnam(None,'mhi-repl-')
     # put quoted contents of current message into tmpfile
     ret = _edit(tmpfile)
@@ -500,11 +506,9 @@ def rmm(args):
     ie: rmm +INBOX 1
     ie: rmm 1:5
 
-    remove messages from a folder
+    Remove the specified messages (or the current message if unspecified)  
+    from the specified folder (or the current folder if unspecified).
     '''
-    if len(args) < 1:
-        print rmm.__doc__
-        sys.exit(1)
     folder, arglist = _argFolder(args)
     if folder:
         state['folder'] = folder
