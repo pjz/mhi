@@ -327,9 +327,12 @@ def repl(args):
     if ret == 0:
         # edit succeeded, wasn't aborted or anything 
         _SMTPsend(tmpfile)
+        if not errcount:
+            os.unlink(tmpfile)
     else:
         # 'abort - throw away session, keep - save it for later'
-        pass
+        print "Session aborted."
+        os.unlink(tmpfile)
 
 
 def folder(args):
@@ -605,7 +608,7 @@ def scan(args):
     Show a list of the specified messages (or all if unspecified)
     in the specified folder, or the current folder if not specified
     '''
-    subjlen = 50
+    subjlen = 47
     if len(args) > 99:
         print scan.__doc__
         sys.exit(1)
@@ -617,6 +620,8 @@ def scan(args):
     msgset = ' '.join(arglist)
     if not msgset:
         msgset = "1:*"
+    else:
+        msgset = _fixupMsgset(msgset, "*")
     _checkMsgset(msgset)
     S = _connect()
     result, data = S.select(folder)
@@ -716,6 +721,7 @@ Commands = { 'folders': folders,
              'next': next,
              'prev': prev,
              'comp': comp,
+             'repl': repl,
              'help': help,
            }
 
