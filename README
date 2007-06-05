@@ -2,33 +2,33 @@
 MHI
 ---
 
-mhi is a comamndline style mailreader in the tradition of mh and
-nmh, but mutated to support IMAP.  
+mhi is a comamndline style mailreader in the tradition of mh and nmh,
+but mutated to support IMAP.
 
 Why?
 
-One thing that IMAP provides is the ability for multiple clients
-to access the same mail store.  Graphical clients are all well
-and good, but sometimes a reversion to the commandline is necessary.
-Neither mh nor nmh will talk to an IMAP server, so I had to write my 
-own client.  Python's imaplib made this easy.
+One thing that IMAP provides is the ability for multiple clients to
+access the same mail store. Graphical clients are all well and good,
+but sometimes a reversion to the commandline is necessary. Neither mh
+nor nmh will talk to an IMAP server, so I had to write my own client.
+Python's imaplib made this easy.
 
 Version history:
 ----------------
 
-0.5  Inital release because I'm losing inspiration and should share what I've managed
-      so far
+0.5 Inital release because I'm losing inspiration and should share what
+    I've managed so far.
 
 TODO:
 -----
 
-*  use getopt
-*  more help - should be self-documenting ala svn/cvs
+ * use getopt
+ * more help - should be self-documenting ala svn/cvs
 
 License:
 --------
 
-  mhi is licensed under either the GPL v2 or a Creative Commons share-alike license.
-  Share and enjoy.
+ mhi is licensed under either the GPL v2 or a Creative Commons
+share-alike license. Share and enjoy.
 
 
