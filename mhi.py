@@ -231,13 +231,13 @@ def do_or_die(func, errormsg):
         sys.exit(1)
     return result, data
 
-def _fixupMsgset(msgset, last):
+def _fixupMsgset(msgset):
     # s/cur/$cur/, s/last/$last/, s/prev/$prev/, s/next/$next/
     msgset = msgset.replace('-', ':')
     cur= state[state['folder']+'.cur']
     msgset = msgset.replace('cur', cur)
-    msgset = msgset.replace('last', last)
-    msgset = msgset.replace('$', last)
+    msgset = msgset.replace('last', "*")
+    msgset = msgset.replace('$', "*")
     # XXX: bounds-check these?
     msgset = msgset.replace('next', str(int(cur)+1))
     msgset = msgset.replace('prev', str(int(cur)-1))
@@ -444,7 +444,7 @@ def refile(args):
     if not destfolder:
         print "Destination folder must be specified."
         sys.exit(1)
-    msgset = ' '.join(arglist)
+    msgset = _fixupMsgset(' '.join(arglist))
     if not msgset:
         try:
             msgset = state[state["folder"]+".cur"]
@@ -483,26 +483,27 @@ def rmf(args):
     '''Usage:  rmf +<foldername>
     remove a folder
     '''
-    if len(args) == 1:
-        folder = args[0][1:]
-    else:
+    folder, arglist = _argFolder(args)
+    if not folder:
         print rmf.__doc__
         sys.exit(1)
     S = _connect()
     result, data = S.select(folder)
     _debug(" Result: %s, %s " % (result, data))
     if result != 'OK':
-        print "Folder '%s' doesn't exist."
+        print "Folder '%s' doesn't exist." % folder
     else:
+    	if state['folder'] == folder:
+	    state['folder'] = 'INBOX'
+	result, data = S.select(state['folder'])
         result, data = S.delete(folder)
         _check_result(result, data, "Problem with delete: ")
     S.close()
     S.logout()
     if result == 'OK':
-        state['folder'] = folder
-        print "Current folder is now %s (%s messages)" % (folder, data[0])
+        print "Folder '%s' deleted." % folder
     else:
-        print "Failed to set folder to '%s': %s" % (folder, data)
+        print "Failed to delete folder '%s': %s" % (folder, data)
 
 def rmm(args):
     '''Usage: rmm [+folder] <messageset>
@@ -515,7 +516,7 @@ def rmm(args):
     folder, arglist = _argFolder(args)
     if folder:
         state['folder'] = folder
-    msgset = ' '.join(arglist)
+    msgset = _fixupMsgset(' '.join(arglist))
     if not msgset:
         try:
             msgset = state[state['folder']+'.cur']
@@ -528,14 +529,12 @@ def rmm(args):
     _check_result(result, data, "Problem changing folders:")
     result, data = S.search(None, msgset)
     _check_result(result, data, "Problem with search:")
-    first = None
-    for num in data[0].split():
-        if first is None: first = num
-        S.store(num, '+FLAGS', '\\Deleted')
+    S.store(msgset, '+FLAGS', '\\Deleted')
     S.expunge()
     print "Deleted."
     S.close()
     S.logout()
+    first = data[0].split()[0]
     state[state['folder']+'.cur'] = first
 
 def _show(folder, msgset):
@@ -563,7 +562,7 @@ def show(args):
     if folder:
         state['folder'] = folder
     folder = state['folder']
-    msgset = ' '.join(arglist)
+    msgset = _fixupMsgset(' '.join(arglist))
     if not msgset:
         try:
             msgset = state[folder+'.cur']
@@ -617,11 +616,9 @@ def scan(args):
     if not folder:
         folder = state['folder']
     state['folder'] = folder
-    msgset = ' '.join(arglist)
+    msgset = _fixupMsgset(' '.join(arglist))
     if not msgset:
         msgset = "1:*"
-    else:
-        msgset = _fixupMsgset(msgset, "*")
     _checkMsgset(msgset)
     S = _connect()
     result, data = S.select(folder)
