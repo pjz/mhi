@@ -234,13 +234,18 @@ def do_or_die(func, errormsg):
 def _fixupMsgset(msgset):
     # s/cur/$cur/, s/last/$last/, s/prev/$prev/, s/next/$next/
     msgset = msgset.replace('-', ':')
-    cur= state[state['folder']+'.cur']
-    msgset = msgset.replace('cur', cur)
+    cur = state.get(state['folder']+'.cur', None)
+    if cur is not None:
+        msgset = msgset.replace('cur', cur)
+        # XXX: bounds-check these?
+        msgset = msgset.replace('next', str(int(cur)+1))
+        msgset = msgset.replace('prev', str(int(cur)-1))
+    else:
+        msgset = msgset.replace('cur', '')
+        msgset = msgset.replace('next', '')
+        msgset = msgset.replace('prev', '')
     msgset = msgset.replace('last', "*")
     msgset = msgset.replace('$', "*")
-    # XXX: bounds-check these?
-    msgset = msgset.replace('next', str(int(cur)+1))
-    msgset = msgset.replace('prev', str(int(cur)-1))
     return msgset 
 
 '''Stub to check that a specified string has the grammar of a msgset'''
@@ -657,9 +662,12 @@ def scan(args):
             outtime = time.strftime("%m/%d", dt)
         except:
             outtime = "??/??"
-        outfrom = str(env_from[0][0])
-        if outfrom == 'NIL':
-            outfrom = "%s@%s" % (env_from[0][2], env_from[0][3])
+	if type(env_from) == type([]):
+            outfrom = str(env_from[0][0])
+            if outfrom == 'NIL':
+                outfrom = "%s@%s" % (env_from[0][2], env_from[0][3])
+	else:
+	    outfrom = "<Unknown>"
         outsubj = str(env_subject)
         if outsubj == 'NIL':
             outsubj = "<no subject>"
