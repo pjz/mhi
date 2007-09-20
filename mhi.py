@@ -221,18 +221,14 @@ def _connect():
     return session
 
 ''' Convenience exit-on-error wrapper '''
-def _check_result(result, data, msgstr):
-    if result != 'OK':
-        print msgstr+' %s' % data
-        sys.exit(1)
-
-def do_or_die(func, errormsg):
+def do_or_die(func, msgstr):
     result, data = func
     if result != 'OK':
         print msgstr+' %s' % data
         sys.exit(1)
-    return result, data
+    return data
 
+''' Change some common symbols into an IMAP-style msgset '''
 def _fixupMsgset(msgset):
     # s/cur/$cur/, s/last/$last/, s/prev/$prev/, s/next/$next/
     msgset = msgset.replace('-', ':')
@@ -329,7 +325,7 @@ def repl(args):
     Reply to the current message, quoting it
     '''
     tmpfile = os.tempnam(None,'mhi-repl-')
-    # put quoted contents of current message into tmpfile
+    # TODO: put quoted contents of current message into tmpfile
     ret = _edit(tmpfile)
     if ret == 0:
         # edit succeeded, wasn't aborted or anything 
@@ -355,17 +351,14 @@ def folder(args):
         print "Folder '%s' doesn't exist.  Create it? " % folder,
         answer = sys.stdin.readline().strip().lower()
         if len(answer) > 0 and answer[0] == 'y':
-            result, data = S.create(folder)
-            _check_result(result, data, "Problem creating folder:")
+	    data = do_or_die(S.create(folder), "Problem creating folder:")
             result, data = S.select(folder)
     S.close()
     S.logout()
     if result == 'OK':
         state['folder'] = folder
         # inbox+ has 64 messages  (1-64); cur=63; (others).
-        cur = state.get(folder+'.cur', None)
-        if cur is None:
-           cur = 'unset'
+        cur = state.get(folder+'.cur', 'unset')
         print "Folder %s has %s messages, cur is %s." % (folder, data[0], cur)
     else:
         print "Failed to set folder to '%s': %s" % (folder, data)
@@ -373,34 +366,31 @@ def folder(args):
 
 def folders(args):
     ''' Show all folders'''
+    HEADER = "FOLDER"
     S = _connect()
-    result, data = S.list()
-    flist = data
+    result, flist = S.list()
     _debug(" flist: %s " % repr(flist))
     stats = {}
     for fline in flist:
         f = str(readsexpr('('+fline+')')[2])
         _debug(" f: %s " % repr(f))
-        stats[f] = readsexpr('('+S.status(f, '(MESSAGES RECENT UNSEEN)')[1][0]+')')[1]
+	result, data = S.status(f, '(MESSAGES RECENT UNSEEN)')
+	if result == 'OK':
+            stats[f] = readsexpr('('+data[0]+')')[1]
     S.logout()
-    stats["FOLDER"] = [0, "# MESSAGES", 0, "RECENT", 0, "UNSEEN"]
+    stats[HEADER] = [0, "# MESSAGES", 0, "RECENT", 0, "UNSEEN"]
     folderlist = [ key for key in stats.keys() if key != 'FOLDER' ]
     folderlist.sort()
     totalmsgs, totalnew = 0, 0
-    for folder in ['FOLDER']+folderlist:
+    for folder in [HEADER]+folderlist:
         _debug(" folder: %s " % repr(folder))
-        iscur = ' '
-        if folder == state['folder']: iscur = '*'
+        iscur = [' ', '*'][ folder == state['folder'] ]
         foo = stats[folder]
         _debug("  Stats: %s " % repr(foo))
-        #_debug("Statsrl: %s " % repr(readsexpr(foo)))
         messages, recent, unseen = foo[1], foo[3], foo[5]
-        cur = state.get(folder+'.cur', None)
-        if cur is None:
-            if folder == 'FOLDER': cur = 'CUR'
-            else: cur = '-'
+        cur = state.get(folder+'.cur', ['-', 'CUR'][ folder == HEADER ])
         print "%s%-20s %7s %7s %7s %7s" % (iscur, folder, cur, messages, recent, unseen)
-        if folder != 'FOLDER':
+        if folder != HEADER:
             totalmsgs += int(messages)
             totalnew += int(unseen)
     print "TOTAL: %d messages (%d new) in %d folders" % (totalmsgs, totalnew, len(folderlist))
@@ -416,14 +406,11 @@ def pick(args):
         print pick.__doc__
         print PickDocs
         sys.exit(1)
-    folder, arglist = _argFolder(args, state['folder'])
-    state['folder'] = folder
+    state['folder'], arglist = _argFolder(args, state['folder'])
     searchstr = '('+' '.join(arglist)+')'
     S = _connect()
-    result, data = S.select(folder)
-    _check_result(result, data, "Problem changing to folder:")
-    result, data = S.search(None, searchstr)
-    _check_result(result, data, "Problem with search criteria:")
+    data = do_or_die(S.select(state['folder']), "Problem changing to folder:")
+    data = do_or_die(S.search(None, searchstr), "Problem with search criteria:")
     _debug("data: %s" % repr(data))
     S.close()
     S.logout()
@@ -448,10 +435,11 @@ def refile(args):
     if destfolder is None:
         print "Destination folder must be specified."
         sys.exit(1)
+    srcfolder = state["folder"]
     msgset = _fixupMsgset(' '.join(arglist))
     if not msgset:
         try:
-            msgset = state[state["folder"]+".cur"]
+            msgset = state[srcfolder+".cur"]
         except KeyError:
             print "No current message selected."
             sys.exit(1)
@@ -464,12 +452,9 @@ def refile(args):
         if len(answer) > 0 and answer[0] == 'y':
             result, data = S.create(destfolder)
     if result == 'OK':
-        result, data = S.select(state['folder'])
-        _check_result(result, data, "Problem changing folders:")
-        result, data = S.copy(msgset, destfolder)
-        _check_result(result, data, "Problem with copy:")
-        result, data = S.search(None, msgset)
-        _check_result(result, data, "Problem with search:")
+        do_or_die(S.select(srcfolder), "Problem changing folders:")
+        do_or_die(S.copy(msgset, destfolder), "Problem with copy:")
+        data = do_or_die(S.search(None, msgset), "Problem with search:")
         print "Refiling... ",
         msgnums = data[0].split()
         for num in msgnums:
@@ -499,9 +484,8 @@ def rmf(args):
     else:
     	if state['folder'] == folder:
 	    state['folder'] = 'INBOX'
-	result, data = S.select(state['folder'])
+        do_or_die(S.select(state['folder']), "Problem changing folders:")
         result, data = S.delete(folder)
-        _check_result(result, data, "Problem with delete: ")
     S.close()
     S.logout()
     if result == 'OK':
@@ -517,7 +501,7 @@ def rmm(args):
     Remove the specified messages (or the current message if unspecified)  
     from the specified folder (or the current folder if unspecified).
     '''
-    folder, arglist = _argFolder(args, state['folder])
+    folder, arglist = _argFolder(args, state['folder'])
     state['folder'] = folder
     msgset = _fixupMsgset(' '.join(arglist))
     if not msgset:
@@ -528,12 +512,10 @@ def rmm(args):
             sys.exit(1)
     _checkMsgset(msgset)
     S = _connect()
-    result, data = S.select(folder)
-    _check_result(result, data, "Problem changing folders:")
-    result, data = S.search(None, msgset)
-    _check_result(result, data, "Problem with search:")
-    S.store(msgset, '+FLAGS', '\\Deleted')
-    S.expunge()
+    do_or_die(S.select(folder), "Problem changing folders:")
+    data = do_or_die(S.search(None, msgset), "Problem with search:")
+    do_or_die(S.store(msgset, '+FLAGS', '\\Deleted'), "Problem setting deleted flag: ")
+    do_or_die(S.expunge(), "Problem expunging deleted messages: ")
     print "Deleted."
     S.close()
     S.logout()
@@ -543,10 +525,8 @@ def rmm(args):
 def _show(folder, msgset):
     '''common code for show/next/prev'''
     S = _connect()
-    result, data = S.select(folder)
-    _check_result(result, data, "Problem changing folders:")
-    result, data = S.search(None, msgset)
-    _check_result(result, data, "Problem with search:")
+    do_or_die(S.select(folder), "Problem changing folders:")
+    data = do_or_die(S.search(None, msgset), "Problem with search:")
     last = None
     for num in data[0].split():
         result, data = S.fetch(num, '(RFC822)')
@@ -555,7 +535,6 @@ def _show(folder, msgset):
     S.close()
     S.logout()
     return last
-
 
 def show(args):
     '''Usage:  show <messageset>
@@ -616,14 +595,13 @@ def scan(args):
         msgset = "1:*"
     _checkMsgset(msgset)
     S = _connect()
-    result, data = S.select(folder)
-    _check_result(result, data, "Problem changing to folder:" )
+    do_or_die(S.select(folder), "Problem changing to folder:" )
     try:
         result, data = S.fetch(msgset, '(ENVELOPE FLAGS)')
     except: pass
     _debug('result: %s' % repr(result))
     _debug('data: %s' % repr(data))
-    _check_result(result, data, "Problem with fetch:" )
+    do_or_die([result, data], "Problem with fetch:" )
     # take out fake/ba hits
     data = [ hit for hit in data if ' ' in hit ]
     if data == [] or data[0] is None:
@@ -646,7 +624,6 @@ def scan(args):
         _debug("env_from: %s" % repr(env_from))
         _debug("env_sender: %s" % repr(env_sender))
         _debug("flags: %s" % repr(flags))
-        #_debug("flags[0]: %s" % repr(flags[0]))
         try:
             dt = time.strptime(' '.join(str(env_date).split()[:5]), "%a, %d %b %Y %H:%M:%S ")
             outtime = time.strftime("%m/%d", dt)
