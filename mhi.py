@@ -351,7 +351,7 @@ def folder(args):
         print "Folder '%s' doesn't exist.  Create it? " % folder,
         answer = sys.stdin.readline().strip().lower()
         if len(answer) > 0 and answer[0] == 'y':
-	    data = do_or_die(S.create(folder), "Problem creating folder:")
+	    do_or_die(S.create(folder), "Problem creating folder:")
             result, data = S.select(folder)
     S.close()
     S.logout()
@@ -409,7 +409,7 @@ def pick(args):
     state['folder'], arglist = _argFolder(args, state['folder'])
     searchstr = '('+' '.join(arglist)+')'
     S = _connect()
-    data = do_or_die(S.select(state['folder']), "Problem changing to folder:")
+    do_or_die(S.select(state['folder']), "Problem changing to folder:")
     data = do_or_die(S.search(None, searchstr), "Problem with search criteria:")
     _debug("data: %s" % repr(data))
     S.close()
