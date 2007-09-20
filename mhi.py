@@ -171,7 +171,7 @@ PickDocs = """ From RFC2060:
 """
 
 
-def _argFolder(args):
+def _argFolder(args, default=None):
     '''
     parse the args into a folder-spec (denoted by a leading +, last of
     which is used if multiple are listed), and the rest of the args
@@ -183,6 +183,8 @@ def _argFolder(args):
             folder = a[1:]
         else:
             outargs.append(a)
+    if folder is None:
+        folder = default
     return folder, outargs
 
 
@@ -342,9 +344,7 @@ def repl(args):
 
 def folder(args):
     ''' Change folders / show current folder'''
-    folder, arglist = _argFolder(args)
-    if not folder:
-        folder = state['folder']
+    folder, arglist = _argFolder(args, state['folder'])
     if arglist:
         print "Usage:  folder +<foldername>"
         sys.exit(1)
@@ -416,12 +416,11 @@ def pick(args):
         print pick.__doc__
         print PickDocs
         sys.exit(1)
-    folder, arglist = _argFolder(args)
-    if folder:
-        state['folder'] = folder
+    folder, arglist = _argFolder(args, state['folder'])
+    state['folder'] = folder
     searchstr = '('+' '.join(arglist)+')'
     S = _connect()
-    result, data = S.select(state['folder'])
+    result, data = S.select(folder)
     _check_result(result, data, "Problem changing to folder:")
     result, data = S.search(None, searchstr)
     _check_result(result, data, "Problem with search criteria:")
@@ -446,7 +445,7 @@ def refile(args):
         print refile.__doc__
         sys.exit(1)
     destfolder, arglist = _argFolder(args)
-    if not destfolder:
+    if destfolder is None:
         print "Destination folder must be specified."
         sys.exit(1)
     msgset = _fixupMsgset(' '.join(arglist))
@@ -518,19 +517,18 @@ def rmm(args):
     Remove the specified messages (or the current message if unspecified)  
     from the specified folder (or the current folder if unspecified).
     '''
-    folder, arglist = _argFolder(args)
-    if folder:
-        state['folder'] = folder
+    folder, arglist = _argFolder(args, state['folder])
+    state['folder'] = folder
     msgset = _fixupMsgset(' '.join(arglist))
     if not msgset:
         try:
-            msgset = state[state['folder']+'.cur']
+            msgset = state[folder+'.cur']
         except KeyError:
             print "No current message selected."
             sys.exit(1)
     _checkMsgset(msgset)
     S = _connect()
-    result, data = S.select(state['folder'])
+    result, data = S.select(folder)
     _check_result(result, data, "Problem changing folders:")
     result, data = S.search(None, msgset)
     _check_result(result, data, "Problem with search:")
@@ -540,7 +538,7 @@ def rmm(args):
     S.close()
     S.logout()
     first = data[0].split()[0]
-    state[state['folder']+'.cur'] = first
+    state[folder+'.cur'] = first
 
 def _show(folder, msgset):
     '''common code for show/next/prev'''
@@ -563,10 +561,8 @@ def show(args):
     '''Usage:  show <messageset>
     show the specified messages, or the current message
     '''
-    folder, arglist = _argFolder(args)
-    if folder:
-        state['folder'] = folder
-    folder = state['folder']
+    folder, arglist = _argFolder(args, state['folder'])
+    state['folder'] = folder
     msgset = _fixupMsgset(' '.join(arglist))
     if not msgset:
         try:
@@ -582,10 +578,8 @@ def next(args):
     '''Usage: next [+<folder>]
     Show the next message in the specified folder, or the current folder if not specified
     '''
-    folder, arglist = _argFolder(args)
-    if folder:
-        state['folder'] = folder
-    folder = state['folder']
+    folder, arglist = _argFolder(args, state['folder'])
+    state['folder'] = folder
     try:
         cur = int(state[folder+'.cur']) + 1
     except KeyError:
@@ -597,10 +591,8 @@ def prev(args):
     '''Usage: prev [+<folder>]
     Show the previous message in the specified folder, or the current folder if not specified
     '''
-    folder, arglist = _argFolder(args)
-    if folder:
-        state['folder'] = folder
-    folder = state['folder']
+    folder, arglist = _argFolder(args, state['folder'])
+    state['folder'] = folder
     try:
         cur = int(state[folder+'.cur']) - 1
     except KeyError:
@@ -617,9 +609,7 @@ def scan(args):
         print scan.__doc__
         sys.exit(1)
     # find any folder refs and put together the msgset string
-    folder, arglist = _argFolder(args)
-    if not folder:
-        folder = state['folder']
+    folder, arglist = _argFolder(args, state['folder'])
     state['folder'] = folder
     msgset = _fixupMsgset(' '.join(arglist))
     if not msgset:
