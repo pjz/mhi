@@ -1,0 +1,12 @@
+#!/bin/sh
+
+$destdir = $1
+if [ "x$destdir" = "x"]; then
+    echo "Must specify a destination directory for the links and wrapper script.";
+    exit 1;
+fi
+
+cp mhiWrap $destdir
+( cd $destdir
+  mhi | sed 's/^.*: //' | tr -s ', ' '\n' | xargs -n 1 ln -s mhiWrap
+)
