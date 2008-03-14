@@ -170,6 +170,8 @@ PickDocs = """ From RFC2060:
 
 """
 
+class UsageError:
+    pass
 
 def _argFolder(args, default=None):
     '''
@@ -339,11 +341,13 @@ def repl(args):
 
 
 def folder(args):
-    ''' Change folders / show current folder'''
+    '''Usage: folder [+<foldername>]
+
+    Change folders / show current folder
+    '''
     folder, arglist = _argFolder(args, state['folder'])
     if arglist:
-        print "Usage:  folder +<foldername>"
-        sys.exit(1)
+    	raise UsageError()
     S = _connect()
     result, data = S.select(folder)
     _debug(" Result: %s, %s " % (result, data))
@@ -365,7 +369,10 @@ def folder(args):
 
 
 def folders(args):
-    ''' Show all folders'''
+    '''Usage: folders
+    
+    Show all folders
+    '''
     HEADER = "FOLDER"
     S = _connect()
     result, flist = S.list()
@@ -398,12 +405,14 @@ def folders(args):
 
 def pick(args):
     '''Usage: pick <search criteria>
+
     Return a message-set that matches the search criteria.
     Criteria are based on the IMAP spec search string.
-    A summary of the IMAP spec is available by calling 'pick' with no options.
+    A summary of the IMAP spec is available by calling 'pick' with --help as its only option.
     '''
     if not args:
-        print pick.__doc__
+    	raise UsageError()
+    if len(args) == 1 and args[0] == "--help":
         print PickDocs
         sys.exit(1)
     state['folder'], arglist = _argFolder(args, state['folder'])
@@ -426,23 +435,23 @@ def pick(args):
 
 def refile(args):
     '''Usage: refile <messageset> +<folder>
+
     Moves a set of messages from the current folder to a new one.
     '''
     if not args:
-        print refile.__doc__
-        sys.exit(1)
+    	raise UsageError()
     destfolder, arglist = _argFolder(args)
     if destfolder is None:
-        print "Destination folder must be specified."
-        sys.exit(1)
+        print "Error: Destination folder must be specified."
+    	raise UsageError()
     srcfolder = state["folder"]
     msgset = _fixupMsgset(' '.join(arglist))
     if not msgset:
         try:
             msgset = state[srcfolder+".cur"]
         except KeyError:
-            print "No current message selected."
-            sys.exit(1)
+            print "Error: No message(s) selected."
+            raise UsageError()
     _checkMsgset(msgset)
     S = _connect()
     result, data = S.select(destfolder)
@@ -474,8 +483,7 @@ def rmf(args):
     '''
     folder, arglist = _argFolder(args)
     if not folder:
-        print rmf.__doc__
-        sys.exit(1)
+    	raise UsageError()
     S = _connect()
     result, data = S.select(folder)
     _debug(" Result: %s, %s " % (result, data))
@@ -495,6 +503,7 @@ def rmf(args):
 
 def rmm(args):
     '''Usage: rmm [+folder] <messageset>
+
     ie: rmm +INBOX 1
     ie: rmm 1:5
 
@@ -508,8 +517,8 @@ def rmm(args):
         try:
             msgset = state[folder+'.cur']
         except KeyError:
-            print "No current message selected."
-            sys.exit(1)
+            print "Error: No current message selected."
+            raise UsageError()
     _checkMsgset(msgset)
     S = _connect()
     do_or_die(S.select(folder), "Problem changing folders:")
@@ -537,8 +546,9 @@ def _show(folder, msgset):
     return last
 
 def show(args):
-    '''Usage:  show <messageset>
-    show the specified messages, or the current message
+    '''Usage:  show [<messageset>]
+
+    Show the specified messages, or the current message if none specified
     '''
     folder, arglist = _argFolder(args, state['folder'])
     state['folder'] = folder
@@ -547,14 +557,15 @@ def show(args):
         try:
             msgset = state[folder+'.cur']
         except KeyError:
-            print "No current message selected."
-            sys.exit(1)
+            print "Error: No current message selected."
+            raise UsageError()
     _checkMsgset(msgset)
     state[folder+'.cur'] = _show(folder, msgset)
 
 # TODO: needs better bounds checking
 def next(args):
     '''Usage: next [+<folder>]
+
     Show the next message in the specified folder, or the current folder if not specified
     '''
     folder, arglist = _argFolder(args, state['folder'])
@@ -585,8 +596,7 @@ def scan(args):
     '''
     subjlen = 47
     if len(args) > 99:
-        print scan.__doc__
-        sys.exit(1)
+    	raise UsageError()
     # find any folder refs and put together the msgset string
     folder, arglist = _argFolder(args, state['folder'])
     state['folder'] = folder
@@ -718,6 +728,9 @@ def _dispatch(args):
 	    try:
                 cmdfunc(cmdargs)
 	    except IOError: pass
+	    except UsageError:
+	    	print cmdfunc.__doc__
+		sys.exit(1)
             config.write()
             state.write()
         else:        
