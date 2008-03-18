@@ -234,6 +234,7 @@ def do_or_die(func, msgstr):
 def _fixupMsgset(msgset):
     # s/cur/$cur/, s/last/$last/, s/prev/$prev/, s/next/$next/
     msgset = msgset.replace('-', ':')
+    msgset = msgset.replace(' ', ',')
     cur = state.get(state['folder']+'.cur', None)
     if cur is not None:
         msgset = msgset.replace('cur', cur)
