@@ -184,7 +184,7 @@ def _argFolder(args, default=None):
     folder = None
     outargs = []
     for a in args:
-        if a[0] == '+' and len(a) > 1:
+        if a.startswith('+') and len(a) > 1:
             folder = a[1:]
         else:
             outargs.append(a)
@@ -343,6 +343,15 @@ def repl(args):
         print "Session aborted."
         os.unlink(tmpfile)
 
+def _selectOrCreate(S, folder):
+    result, data = S.select(folder)
+    _debug(" Result: %s, %s " % (result, data))
+    if result != 'OK':
+        print "Folder '%s' doesn't exist.  Create it? " % folder,
+        answer = sys.stdin.readline().strip().lower()
+        if answer.startswith('y'):
+	    do_or_die(S.create(folder), "Problem creating folder:")
+            do_or_die(S.select(folder), "Problem selecting newly created folder:")
 
 def folder(args):
     '''Usage: folder [+<foldername>]
@@ -353,14 +362,7 @@ def folder(args):
     if arglist:
     	raise UsageError()
     S = _connect()
-    result, data = S.select(folder)
-    _debug(" Result: %s, %s " % (result, data))
-    if result != 'OK':
-        print "Folder '%s' doesn't exist.  Create it? " % folder,
-        answer = sys.stdin.readline().strip().lower()
-        if len(answer) > 0 and answer[0] == 'y':
-	    do_or_die(S.create(folder), "Problem creating folder:")
-            result, data = S.select(folder)
+    _selectOrCreate(S, folder)
     S.close()
     S.logout()
     if result == 'OK':
@@ -458,26 +460,18 @@ def refile(args):
             raise UsageError()
     _checkMsgset(msgset)
     S = _connect()
-    result, data = S.select(destfolder)
-    if result != 'OK':
-        print "Folder '%s' doesn't exist.  Create it? " % destfolder,
-        answer = sys.stdin.readline().strip().lower()
-        if len(answer) > 0 and answer[0] == 'y':
-            result, data = S.create(destfolder)
-    if result == 'OK':
-        do_or_die(S.select(srcfolder), "Problem changing folders:")
-        do_or_die(S.copy(msgset, destfolder), "Problem with copy:")
-        data = do_or_die(S.search(None, msgset), "Problem with search:")
-        print "Refiling... ",
-        msgnums = data[0].split()
-        for num in msgnums:
-            S.store(num, '+FLAGS', '\\Deleted')
-            print ".", 
-        S.expunge()
-        print "%d messages refiled to '%s'." % (len(msgnums), destfolder)
-        S.close()
-    else:
-        print "Aborting refile: %s" % data
+    _selectOrCreate(S, destfolder)
+    do_or_die(S.select(srcfolder), "Problem changing folders:")
+    do_or_die(S.copy(msgset, destfolder), "Problem with copy:")
+    data = do_or_die(S.search(None, msgset), "Problem with search:")
+    print "Refiling... ",
+    msgnums = data[0].split()
+    for num in msgnums:
+        S.store(num, '+FLAGS', '\\Deleted')
+        print ".", 
+    S.expunge()
+    print "%d messages refiled to '%s'." % (len(msgnums), destfolder)
+    S.close()
     S.logout()
     print "Done."
 
