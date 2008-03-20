@@ -11,6 +11,9 @@
 #   actually touching the mailboxes.  This will affect the working of
 #   anything that takes a msgset as well as scan, next, prev, and pick
 #
+# * scan/show/next/prev should run their output via $PAGER iff sys.stdout.isatty()
+#   via f = os.popen(os.environ['PAGER'], 'w'), then write to f
+#
 # minor bits of code taken from http://www.w3.org/2000/04/maillog2rdf/imap_sort.py
 # everything else Copyright Paul Jimenez, released under the GPL
 # canonical copy at http://www.place.org/~pj/software/mhi
@@ -741,4 +744,6 @@ def _dispatch(args):
 
 # main program
 
-_dispatch(sys.argv)
+if __name__ == '__main__':
+    _dispatch(sys.argv)
+
