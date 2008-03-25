@@ -239,7 +239,10 @@ def _fixupMsgset(msgset):
     msgset = msgset.replace('-', ':')
     msgset = msgset.replace(' ', ',')
     cur = state.get(state['folder']+'.cur', None)
+    if cur == 'None': cur = None
     if cur is not None:
+    	#print "DEBUG: cur is %s" % repr(cur)
+    	#print "DEBUG: type(cur) is %s" % repr(type(cur))
         msgset = msgset.replace('cur', cur)
         # XXX: bounds-check these?
         msgset = msgset.replace('next', str(int(cur)+1))
@@ -352,6 +355,7 @@ def _selectOrCreate(S, folder):
         if answer.startswith('y'):
 	    do_or_die(S.create(folder), "Problem creating folder:")
             do_or_die(S.select(folder), "Problem selecting newly created folder:")
+    return data
 
 def folder(args):
     '''Usage: folder [+<foldername>]
@@ -362,17 +366,13 @@ def folder(args):
     if arglist:
     	raise UsageError()
     S = _connect()
-    _selectOrCreate(S, folder)
+    data = _selectOrCreate(S, folder)
     S.close()
     S.logout()
-    if result == 'OK':
-        state['folder'] = folder
-        # inbox+ has 64 messages  (1-64); cur=63; (others).
-        cur = state.get(folder+'.cur', 'unset')
-        print "Folder %s has %s messages, cur is %s." % (folder, data[0], cur)
-    else:
-        print "Failed to set folder to '%s': %s" % (folder, data)
-
+    state['folder'] = folder
+    # inbox+ has 64 messages  (1-64); cur=63; (others).
+    cur = state.get(folder+'.cur', 'unset')
+    print "Folder %s has %s messages, cur is %s." % (folder, data[0], cur)
 
 def folders(args):
     '''Usage: folders
