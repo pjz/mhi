@@ -192,7 +192,6 @@ def _argFolder(args, default=None):
         folder = default
     return folder, outargs
 
-
 def _connect():
     ''' Convenience connection creation function '''
     import urlparse
@@ -229,7 +228,7 @@ def _connect():
 def do_or_die(func, msgstr):
     result, data = func
     if result != 'OK':
-        print msgstr+' %s' % data
+        print msgstr+' ' + str(data)
         sys.exit(1)
     return data
 
@@ -355,6 +354,8 @@ def _selectOrCreate(S, folder):
         if answer.startswith('y'):
 	    do_or_die(S.create(folder), "Problem creating folder:")
             do_or_die(S.select(folder), "Problem selecting newly created folder:")
+        else:
+	    do_or_die(('',''), "Nothing done. exiting.")
     return data
 
 def folder(args):
@@ -410,7 +411,7 @@ def folders(args):
 
 
 def pick(args):
-    '''Usage: pick <search criteria>
+    '''Usage: pick <search criteria> [+folder]
 
     Return a message-set that matches the search criteria.
     Criteria are based on the IMAP spec search string.
@@ -611,7 +612,7 @@ def scan(args):
     _debug('data: %s' % repr(data))
     do_or_die([result, data], "Problem with fetch:" )
     # take out fake/ba hits
-    data = [ hit for hit in data if ' ' in hit ]
+    data = [ hit for hit in data if hit and ' ' in hit ]
     if data == [] or data[0] is None:
         print "No messages."
         sys.exit(0)
@@ -739,5 +740,8 @@ def _dispatch(args):
 # main program
 
 if __name__ == '__main__':
-    _dispatch(sys.argv)
+    try:
+        _dispatch(sys.argv)
+    except KeyboardInterrupt:
+        print "Interrupted."
 
