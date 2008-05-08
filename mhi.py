@@ -5,14 +5,17 @@
 # Commands that work: folder, folders, scan, rmm, rmf, pick/search, help,
 #                     debug, refile, show, next, prev
 #
-# Commands to make work: sort, comp, repl, dist, forw, anno
+# Commands to make work: sort, comp, repl, dist, forw, anno, mr
 #
 # * sort should just store a sort order to apply to output instead of
 #   actually touching the mailboxes.  This will affect the working of
 #   anything that takes a msgset as well as scan, next, prev, and pick
 #
-# * scan/show/next/prev should run their output via $PAGER iff sys.stdout.isatty()
-#   via f = os.popen(os.environ['PAGER'], 'w'), then write to f
+# * mr should do a 'mark all read' on the current (or specified) folder
+#
+# handy aliases: 
+#    mailchk - folders with new messages - mhi folders |grep -v " 0$"
+#    nn - show new messages in a folder- mhi scan `mhi pick \Unseen`
 #
 # minor bits of code taken from http://www.w3.org/2000/04/maillog2rdf/imap_sort.py
 # everything else Copyright Paul Jimenez, released under the GPL
@@ -23,11 +26,12 @@ import os
 import sys
 import time
 import string
+import os.path
 import imaplib
 import StringIO
 from configobj import ConfigObj
 
-cfgdir=os.environ.get('HOME','')
+cfgdir = os.environ.get('HOME','')
 config = ConfigObj(infile="%s/.mhirc" % cfgdir, create_empty=True)
 state = ConfigObj(infile="%s/.mhistate" % cfgdir, create_empty=True)
 Debug = 0
@@ -190,6 +194,9 @@ def _argFolder(args, default=None):
             outargs.append(a)
     if folder is None:
         folder = default
+    else:
+        prefix = config.get('folder_prefix','')
+        folder = prefix + folder
     return folder, outargs
 
 def _connect():
@@ -235,8 +242,6 @@ def do_or_die(func, msgstr):
 ''' Change some common symbols into an IMAP-style msgset '''
 def _fixupMsgset(msgset):
     # s/cur/$cur/, s/last/$last/, s/prev/$prev/, s/next/$next/
-    msgset = msgset.replace('-', ':')
-    msgset = msgset.replace(' ', ',')
     cur = state.get(state['folder']+'.cur', None)
     if cur == 'None': cur = None
     if cur is not None:
@@ -247,9 +252,14 @@ def _fixupMsgset(msgset):
         msgset = msgset.replace('next', str(int(cur)+1))
         msgset = msgset.replace('prev', str(int(cur)-1))
     else:
-        msgset = msgset.replace('cur', '')
-        msgset = msgset.replace('next', '')
-        msgset = msgset.replace('prev', '')
+        requiresCur = False
+	for dep in ["cur", "prev", "next"]:
+	    requiresCur = requiresCur or dep in msgset
+        if requiresCur:
+	    print "No current message, so '%s' makes no sense." % msgset
+	    sys.exit(1)
+    msgset = msgset.replace('-', ':')
+    msgset = msgset.replace(' ', ',')
     msgset = msgset.replace('last', "*")
     msgset = msgset.replace('$', "*")
     return msgset 
@@ -358,6 +368,12 @@ def _selectOrCreate(S, folder):
 	    do_or_die(('',''), "Nothing done. exiting.")
     return data
 
+def folder_name(folder):
+    prefix = config.get('folder_prefix',None)
+    if prefix and folder.startswith(prefix):
+        return folder[len(prefix):]
+    return folder
+
 def folder(args):
     '''Usage: folder [+<foldername>]
 
@@ -373,7 +389,7 @@ def folder(args):
     state['folder'] = folder
     # inbox+ has 64 messages  (1-64); cur=63; (others).
     cur = state.get(folder+'.cur', 'unset')
-    print "Folder %s has %s messages, cur is %s." % (folder, data[0], cur)
+    print "Folder %s has %s messages, cur is %s." % (folder_name(folder), data[0], cur)
 
 def folders(args):
     '''Usage: folders
@@ -403,7 +419,7 @@ def folders(args):
         _debug("  Stats: %s " % repr(foo))
         messages, recent, unseen = foo[1], foo[3], foo[5]
         cur = state.get(folder+'.cur', ['-', 'CUR'][ folder == HEADER ])
-        print "%s%-20s %7s %7s %7s %7s" % (iscur, folder, cur, messages, recent, unseen)
+        print "%s%-20s %7s %7s %7s %7s" % (iscur, folder_name(folder), cur, messages, recent, unseen)
         if folder != HEADER:
             totalmsgs += int(messages)
             totalnew += int(unseen)
@@ -529,6 +545,33 @@ def rmm(args):
     S.logout()
     first = data[0].split()[0]
     state[folder+'.cur'] = first
+
+def mr(args):
+    '''Usage: mr [+folder] <messageset>
+
+    Mark the specified messages (or the current message if unspecified)
+    from the specified folder (or the current folder if unspecified) as read.
+    '''
+    folder, arglist = _argFolder(args, state['folder'])
+    state['folder'] = folder
+    msgset = _fixupMsgset(' '.join(arglist))
+    if not msgset:
+        try:
+            msgset = state[folder+'.cur']
+        except KeyError:
+            print "Error: No current message selected."
+            raise UsageError()
+    _checkMsgset(msgset)
+    S = _connect()
+    do_or_die(S.select(folder), "Problem changing folders:")
+    data = do_or_die(S.search(None, msgset), "Problem with search:")
+    do_or_die(S.store(msgset, '+FLAGS', '\\Seen'), "Problem setting read flag: ")
+    S.close()
+    S.logout()
+    first = data[0].split()[0]
+    state[folder+'.cur'] = first
+
+
 
 def _show(folder, msgset):
     '''common code for show/next/prev'''
@@ -704,6 +747,7 @@ Commands = { 'folders': folders,
              'comp': comp,
              'repl': repl,
              'help': help,
+	     'mr': mr
            }
 
 
@@ -740,6 +784,15 @@ def _dispatch(args):
 # main program
 
 if __name__ == '__main__':
+    if sys.stdout.isatty():
+       pager = os.environ.get('PAGER', None)
+       if pager is None:
+           for p in [ '/usr/bin/less', '/bin/more' ]:
+               if os.path.exists(p):
+	           pager = p
+		   break
+       if pager is not None:
+           sys.stdout = os.popen(pager, 'w')
     try:
         _dispatch(sys.argv)
     except KeyboardInterrupt:
