@@ -231,16 +231,27 @@ def _connect():
     session.debug = Debug
     return session
 
-''' Convenience exit-on-error wrapper '''
+def enable_pager():
+    if sys.stdout.isatty():
+       pager = os.environ.get('PAGER', None)
+       if pager is None:
+           for p in [ '/usr/bin/less', '/bin/more' ]:
+               if os.path.exists(p):
+	           pager = p
+		   break
+       if pager is not None:
+           sys.stdout = os.popen(pager, 'w')
+
 def do_or_die(func, msgstr):
+    ''' Convenience exit-on-error wrapper '''
     result, data = func
     if result != 'OK':
         print msgstr+' ' + str(data)
         sys.exit(1)
     return data
 
-''' Change some common symbols into an IMAP-style msgset '''
 def _fixupMsgset(msgset):
+    ''' Change some common symbols into an IMAP-style msgset '''
     # s/cur/$cur/, s/last/$last/, s/prev/$prev/, s/next/$next/
     cur = state.get(state['folder']+'.cur', None)
     if cur == 'None': cur = None
@@ -264,8 +275,8 @@ def _fixupMsgset(msgset):
     msgset = msgset.replace('$', "*")
     return msgset 
 
-'''Stub to check that a specified string has the grammar of a msgset'''
 def _checkMsgset(msgset):
+    '''Stub to check that a specified string has the grammar of a msgset'''
     ## FIXME: need a better check that msgset is a valid imap messageset string
     # msgset = int | int:int | msgset,msgset
     # '1', '1:5', '1,2,3', '1,3:5' are all valid
@@ -396,6 +407,7 @@ def folders(args):
     
     Show all folders
     '''
+    enable_pager()
     HEADER = "FOLDER"
     S = _connect()
     result, flist = S.list()
@@ -565,16 +577,19 @@ def mr(args):
     S = _connect()
     do_or_die(S.select(folder), "Problem changing folders:")
     data = do_or_die(S.search(None, msgset), "Problem with search:")
+    _debug("data: %s" % repr(data))
     do_or_die(S.store(msgset, '+FLAGS', '\\Seen'), "Problem setting read flag: ")
     S.close()
     S.logout()
-    first = data[0].split()[0]
-    state[folder+'.cur'] = first
+    if data[0]:
+        first = data[0].split()[0]
+        state[folder+'.cur'] = first
 
 
 
 def _show(folder, msgset):
     '''common code for show/next/prev'''
+    enable_pager()
     S = _connect()
     do_or_die(S.select(folder), "Problem changing folders:")
     data = do_or_die(S.search(None, msgset), "Problem with search:")
@@ -636,6 +651,7 @@ def scan(args):
     Show a list of the specified messages (or all if unspecified)
     in the specified folder, or the current folder if not specified
     '''
+    enable_pager()
     subjlen = 47
     if len(args) > 99:
     	raise UsageError()
@@ -781,18 +797,11 @@ def _dispatch(args):
     else:
         print "Must specify a command.  Valid ones: %s " % ', '.join(_sort(Commands.keys()))
 
+
+
 # main program
 
 if __name__ == '__main__':
-    if sys.stdout.isatty():
-       pager = os.environ.get('PAGER', None)
-       if pager is None:
-           for p in [ '/usr/bin/less', '/bin/more' ]:
-               if os.path.exists(p):
-	           pager = p
-		   break
-       if pager is not None:
-           sys.stdout = os.popen(pager, 'w')
     try:
         _dispatch(sys.argv)
     except KeyboardInterrupt:
