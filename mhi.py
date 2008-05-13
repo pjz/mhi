@@ -301,8 +301,11 @@ def _edit(msgfile):
     ''' internal common code for comp/repl/dist/medit '''
     env = os.environ
     editor = env.get('VISUAL',env.get('EDITOR', 'editor'))
-    fin = os.system("%s %s" % (editor, msgfile))
-    _crlf_terminate(msgfile)
+    try:
+        fin = os.system("%s %s" % (editor, msgfile))
+	_crlf_terminate(msgfile)
+    except Exception:
+        return 1
     return fin
 
 def _SMTPsend(msgfile):
@@ -312,6 +315,7 @@ def _SMTPsend(msgfile):
     msg = email.message_from_file(file(msgfile,"r"))
     fromaddr = msg.get('From','')
     toaddrs = msg.get_all('To',[])
+    _debug("composing message from %s to %s" % (repr(fromaddr), repr(toaddrs)))
     server = smtplib.SMTP('localhost')
     #server.set_debuglevel(1)
     try:
@@ -345,7 +349,10 @@ def comp(args):
     else:
         # 'abort - throw away session, keep - save it for later'
         print "Session aborted."
-        os.unlink(tmpfile)
+	try:
+            os.unlink(tmpfile)
+	except:
+	    pass
 
 
 def repl(args):
@@ -589,6 +596,7 @@ def mr(args):
 
 def _show(folder, msgset):
     '''common code for show/next/prev'''
+    import email
     enable_pager()
     S = _connect()
     do_or_die(S.select(folder), "Problem changing folders:")
@@ -596,7 +604,9 @@ def _show(folder, msgset):
     last = None
     for num in data[0].split():
         result, data = S.fetch(num, '(RFC822)')
-        print "(Message %s:%s)\n%s\n" % (folder, num, data[0][1])
+        print "(Message %s:%s)\n" % (folder, num)
+	print "%s\n" % data[0][1]
+	#msg = email.message_from_string(data[0][1])
         last = num
     S.close()
     S.logout()
