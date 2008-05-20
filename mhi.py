@@ -284,16 +284,21 @@ def _checkMsgset(msgset):
         print "%s isn't a valid messageset. Try again." % msgset
         sys.exit(1)
 
+def tempFileName(*args,**kwargs):
+    import tempfile
+    return tempfile.NamedTemporaryFile(*args,**kwargs).name
+
 def _crlf_terminate(msgfile):
     ''' convenience function to turn a \n terminated file into a \r\n terminated file '''
-    tfile = os.tempnam()
+    tfile = tempFileName(prefix="mhi")
     os.rename(msgfile,tfile)
     inf = file(tfile,"r")
     outf = file(msgfile,"w")
     for line in inf:
-        if len(line) >= 2 and line[-2] != '\r' and line[-1] == '\n':
-           line = line[:-1]+'\r\n'
-           outf.write(line)
+        if not line.endswith('\r\n'):
+	   line = line[:-1] # strip existing \n (or \r?)
+           line += '\r\n'   # add new lineending
+        outf.write(line)
     inf.close()
     outf.close()
 
@@ -339,7 +344,10 @@ def comp(args):
     
     Compose a new message
     '''
-    tmpfile = os.tempnam(None,'mhi-comp-')
+    tmpfile = tempFileName(prefix="mhi-comp-")
+    if config.get('comp_template', None):
+       import shutil
+       shutil.copyfile(config['comp_template'], tmpfile) 
     ret = _edit(tmpfile)
     if ret == 0:
         # edit succeeded, wasn't aborted or anything 
@@ -360,8 +368,10 @@ def repl(args):
     
     Reply to the current message, quoting it
     '''
-    tmpfile = os.tempnam(None,'mhi-repl-')
+    tmpfile = tempFileName(prefix="mhi-repl-")
     # TODO: put quoted contents of current message into tmpfile
+    # TODO: put the author of the current message in the 'To:' field
+    # TODO: swipe MH's -cc, etc syntax for specifying who to copy
     ret = _edit(tmpfile)
     if ret == 0:
         # edit succeeded, wasn't aborted or anything 
