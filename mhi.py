@@ -208,21 +208,21 @@ def _connect():
     scheme, netloc, path, _, _, _ = urlparse.urlparse(config['connection'])
     _debug('scheme: %s netloc: %s path: %s' % (scheme, netloc, path))
     if netloc:
-	if '@' in netloc:
+        if '@' in netloc:
             userpass, hostport = netloc.rsplit('@', 1)
-	else:
-	    userpass, hostport = netloc, 'localhost'
-	if ':' in hostport:
+        else:
+            userpass, hostport = netloc, 'localhost'
+        if ':' in hostport:
             host, port = hostport.rsplit(':', 1)
-	else:
-	    host = hostport
+        else:
+            host = hostport
             port = "143"
             if scheme[-1] == 's':
                 port = "993"
-	if ':' in userpass:
+        if ':' in userpass:
             user, passwd = userpass.split(':', 1)
-	else:
-	    user, passwd = os.environ.get('USER',''), userpass
+        else:
+            user, passwd = os.environ.get('USER',''), userpass
         _debug("%s connection to %s : %s @ %s : %s" % (scheme, user, passwd, host, port))
         session = schemes[scheme](host, int(port))
         session.login(user, passwd)
@@ -237,8 +237,8 @@ def enable_pager():
        if pager is None:
            for p in [ '/usr/bin/less', '/bin/more' ]:
                if os.path.exists(p):
-	           pager = p
-		   break
+                   pager = p
+                   break
        if pager is not None:
            sys.stdout = os.popen(pager, 'w')
 
@@ -256,19 +256,19 @@ def _fixupMsgset(msgset):
     cur = state.get(state['folder']+'.cur', None)
     if cur == 'None': cur = None
     if cur is not None:
-    	#print "DEBUG: cur is %s" % repr(cur)
-    	#print "DEBUG: type(cur) is %s" % repr(type(cur))
+        #print "DEBUG: cur is %s" % repr(cur)
+        #print "DEBUG: type(cur) is %s" % repr(type(cur))
         msgset = msgset.replace('cur', cur)
         # XXX: bounds-check these?
         msgset = msgset.replace('next', str(int(cur)+1))
         msgset = msgset.replace('prev', str(int(cur)-1))
     else:
         requiresCur = False
-	for dep in ["cur", "prev", "next"]:
-	    requiresCur = requiresCur or dep in msgset
+        for dep in ["cur", "prev", "next"]:
+            requiresCur = requiresCur or dep in msgset
         if requiresCur:
-	    print "No current message, so '%s' makes no sense." % msgset
-	    sys.exit(1)
+            print "No current message, so '%s' makes no sense." % msgset
+            sys.exit(1)
     msgset = msgset.replace('-', ':')
     msgset = msgset.replace(' ', ',')
     msgset = msgset.replace('last', "*")
@@ -296,7 +296,7 @@ def _crlf_terminate(msgfile):
     outf = file(msgfile,"w")
     for line in inf:
         if not line.endswith('\r\n'):
-	   line = line[:-1] # strip existing \n (or \r?)
+           line = line[:-1] # strip existing \n (or \r?)
            line += '\r\n'   # add new lineending
         outf.write(line)
     inf.close()
@@ -308,7 +308,8 @@ def _edit(msgfile):
     editor = env.get('VISUAL',env.get('EDITOR', 'editor'))
     try:
         fin = os.system("%s %s" % (editor, msgfile))
-	_crlf_terminate(msgfile)
+        if os.path.exists(msgfile):
+            _crlf_terminate(msgfile)
     except Exception:
         return 1
     return fin
@@ -339,6 +340,31 @@ def _SMTPsend(msgfile):
     return len(ret.keys())
 
 
+def _quoted_current():
+    pass 
+
+
+macros = { 
+    '###QUOTED###': _quoted_current
+}
+
+def _template_update(msgfile):
+    tmpfile = tempFileName(prefix="mhi-pre-template-")
+    import shutil
+    shutil.move(msgfile, tmpfile)
+    outfile = open(msgfile, "w")
+    for line in tmpfile:
+        replacements = 1
+    	while replacements:
+            replacements = 0
+            for macro, impl in macros:
+                if macro in line:
+	            line = line.replace(macro, impl())
+                    replacements += 1
+        outfile.write(line)
+    outfile.close()
+
+
 def comp(args):
     '''Usage: comp
     
@@ -357,10 +383,10 @@ def comp(args):
     else:
         # 'abort - throw away session, keep - save it for later'
         print "Session aborted."
-	try:
+        try:
             os.unlink(tmpfile)
-	except:
-	    pass
+        except:
+            pass
 
 
 def repl(args):
@@ -369,13 +395,17 @@ def repl(args):
     Reply to the current message, quoting it
     '''
     tmpfile = tempFileName(prefix="mhi-repl-")
+    if config.get('repl_template', None):
+        import shutil
+        shutil.copyfile(config['repl_template'], tmpfile)
+        _template_update(tmpfile)
     # TODO: put quoted contents of current message into tmpfile
     # TODO: put the author of the current message in the 'To:' field
     # TODO: swipe MH's -cc, etc syntax for specifying who to copy
     ret = _edit(tmpfile)
     if ret == 0:
         # edit succeeded, wasn't aborted or anything 
-        _SMTPsend(tmpfile)
+        errcount = _SMTPsend(tmpfile)
         if not errcount:
             os.unlink(tmpfile)
     else:
@@ -390,10 +420,10 @@ def _selectOrCreate(S, folder):
         print "Folder '%s' doesn't exist.  Create it? " % folder,
         answer = sys.stdin.readline().strip().lower()
         if answer.startswith('y'):
-	    do_or_die(S.create(folder), "Problem creating folder:")
+            do_or_die(S.create(folder), "Problem creating folder:")
             do_or_die(S.select(folder), "Problem selecting newly created folder:")
         else:
-	    do_or_die(('',''), "Nothing done. exiting.")
+            do_or_die(('',''), "Nothing done. exiting.")
     return data
 
 def folder_name(folder):
@@ -409,7 +439,7 @@ def folder(args):
     '''
     folder, arglist = _argFolder(args, state['folder'])
     if arglist:
-    	raise UsageError()
+        raise UsageError()
     S = _connect()
     data = _selectOrCreate(S, folder)
     S.close()
@@ -433,8 +463,8 @@ def folders(args):
     for fline in flist:
         f = str(readsexpr('('+fline+')')[2])
         _debug(" f: %s " % repr(f))
-	result, data = S.status(f, '(MESSAGES RECENT UNSEEN)')
-	if result == 'OK':
+        result, data = S.status(f, '(MESSAGES RECENT UNSEEN)')
+        if result == 'OK':
             stats[f] = readsexpr('('+data[0]+')')[1]
     S.logout()
     stats[HEADER] = [0, "# MESSAGES", 0, "RECENT", 0, "UNSEEN"]
@@ -463,7 +493,7 @@ def pick(args):
     A summary of the IMAP spec is available by calling 'pick' with --help as its only option.
     '''
     if not args:
-    	raise UsageError()
+        raise UsageError()
     if len(args) == 1 and args[0] == "--help":
         print PickDocs
         sys.exit(1)
@@ -491,11 +521,11 @@ def refile(args):
     Moves a set of messages from the current folder to a new one.
     '''
     if not args:
-    	raise UsageError()
+        raise UsageError()
     destfolder, arglist = _argFolder(args)
     if destfolder is None:
         print "Error: Destination folder must be specified."
-    	raise UsageError()
+        raise UsageError()
     srcfolder = state["folder"]
     msgset = _fixupMsgset(' '.join(arglist))
     if not msgset:
@@ -527,15 +557,15 @@ def rmf(args):
     '''
     folder, arglist = _argFolder(args)
     if not folder:
-    	raise UsageError()
+        raise UsageError()
     S = _connect()
     result, data = S.select(folder)
     _debug(" Result: %s, %s " % (result, data))
     if result != 'OK':
         print "Folder '%s' doesn't exist." % folder
     else:
-    	if state['folder'] == folder:
-	    state['folder'] = 'INBOX'
+        if state['folder'] == folder:
+            state['folder'] = 'INBOX'
         do_or_die(S.select(state['folder']), "Problem changing folders:")
         result, data = S.delete(folder)
     S.close()
@@ -573,6 +603,7 @@ def rmm(args):
     S.close()
     S.logout()
     first = data[0].split()[0]
+    # TODO: fix this
     state[folder+'.cur'] = first
 
 def mr(args):
@@ -603,7 +634,6 @@ def mr(args):
         state[folder+'.cur'] = first
 
 
-
 def _show(folder, msgset):
     '''common code for show/next/prev'''
     import email
@@ -615,12 +645,13 @@ def _show(folder, msgset):
     for num in data[0].split():
         result, data = S.fetch(num, '(RFC822)')
         print "(Message %s:%s)\n" % (folder, num)
-	print "%s\n" % data[0][1]
-	#msg = email.message_from_string(data[0][1])
+        print "%s\n" % data[0][1]
+        #msg = email.message_from_string(data[0][1])
         last = num
     S.close()
     S.logout()
     return last
+
 
 def show(args):
     '''Usage:  show [<messageset>]
@@ -674,7 +705,7 @@ def scan(args):
     enable_pager()
     subjlen = 47
     if len(args) > 99:
-    	raise UsageError()
+        raise UsageError()
     # find any folder refs and put together the msgset string
     folder, arglist = _argFolder(args, state['folder'])
     state['folder'] = folder
@@ -717,12 +748,12 @@ def scan(args):
             outtime = time.strftime("%m/%d", dt)
         except:
             outtime = "??/??"
-	if type(env_from) == type([]):
+        if type(env_from) == type([]):
             outfrom = str(env_from[0][0])
             if outfrom == 'NIL':
                 outfrom = "%s@%s" % (env_from[0][2], env_from[0][3])
-	else:
-	    outfrom = "<Unknown>"
+        else:
+            outfrom = "<Unknown>"
         outsubj = str(env_subject)
         if outsubj == 'NIL':
             outsubj = "<no subject>"
@@ -783,7 +814,7 @@ Commands = { 'folders': folders,
              'comp': comp,
              'repl': repl,
              'help': help,
-	     'mr': mr
+             'mr': mr
            }
 
 
@@ -804,12 +835,12 @@ def _dispatch(args):
         cmdfunc = Commands.get(cmd,None)
         if cmdfunc:
             _debug("cmdfunc: %s" % cmdfunc)
-	    try:
+            try:
                 cmdfunc(cmdargs)
-	    except IOError: pass
-	    except UsageError:
-	    	print cmdfunc.__doc__
-		sys.exit(1)
+            except IOError: pass
+            except UsageError:
+                print cmdfunc.__doc__
+                sys.exit(1)
             config.write()
             state.write()
         else:        
