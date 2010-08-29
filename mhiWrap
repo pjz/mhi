@@ -1,2 +1,3 @@
 #!/bin/bash
-/home/pj/proj/mhi/mhi `basename $0` "$@"
+MHI=/home/pj/bin/mhi-bin/mhi.py
+$MHI `basename $0` "$@"

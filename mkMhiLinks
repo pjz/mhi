@@ -1,7 +1,7 @@
 #!/bin/sh
 
-$destdir = $1
-if [ "x$destdir" = "x"]; then
+destdir=$1
+if [ "x$destdir" = "x" ]; then
     echo "Must specify a destination directory for the links and wrapper script.";
     exit 1;
 fi
