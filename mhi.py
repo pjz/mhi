@@ -3,15 +3,13 @@
 # Goal: MH-ish commands that will talk to an IMAP server
 #
 # Commands that work: folder, folders, scan, rmm, rmf, pick/search, help,
-#                     debug, refile, show, next, prev
+#                     debug, refile, show, next, prev, mr
 #
-# Commands to make work: sort, comp, repl, dist, forw, anno, mr
+# Commands to make work: sort, comp, repl, dist, forw, anno
 #
 # * sort should just store a sort order to apply to output instead of
 #   actually touching the mailboxes.  This will affect the working of
 #   anything that takes a msgset as well as scan, next, prev, and pick
-#
-# * mr should do a 'mark all read' on the current (or specified) folder
 #
 # handy aliases: 
 #    mailchk - folders with new messages - mhi folders |grep -v " 0$"
@@ -193,10 +191,15 @@ def _argFolder(args, default=None):
         else:
             outargs.append(a)
     if folder is None:
+        # nothing specified, use the default folder
         folder = default
+    elif folder.startswith('+'):
+        # double leading + means ignore the folder prefix
+        folder = folder[1:]
     else:
         prefix = config.get('folder_prefix','')
         folder = prefix + folder
+
     return folder, outargs
 
 def _connect():
