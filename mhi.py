@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python2.6
 #
 # Goal: MH-ish commands that will talk to an IMAP server
 #
@@ -637,19 +637,33 @@ def mr(args):
         state[folder+'.cur'] = first
 
 
+def _headers_from(msg):
+    lines = msg.split("\r\n")
+    result = ""
+    for line in msg.split("\r\n"):
+        if line:
+            result += line + "\n"
+        else:
+            return result
+    return result
+
+
 def _show(folder, msgset):
     '''common code for show/next/prev'''
     import email
     enable_pager()
     S = _connect()
     do_or_die(S.select(folder), "Problem changing folders:")
-    data = do_or_die(S.search(None, msgset), "Problem with search:")
+    msglist = do_or_die(S.search(None, msgset), "Problem with search:")
     last = None
-    for num in data[0].split():
+    for num in msglist[0].split():
         result, data = S.fetch(num, '(RFC822)')
-        print "(Message %s:%s)\n" % (folder, num)
-        print "%s\n" % data[0][1]
-        #msg = email.message_from_string(data[0][1])
+        print "(Message %s:%s)" % (folder, num)
+        msg = email.message_from_string(data[0][1])
+        print _headers_from(data[0][1])
+        for part in msg.walk():
+            _debug("PART %s:" % part.get_content_type())
+            print part.get_payload(decode=True)
         last = num
     S.close()
     S.logout()
