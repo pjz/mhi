@@ -289,7 +289,10 @@ def _checkMsgset(msgset):
 
 def tempFileName(*args,**kwargs):
     import tempfile
-    return tempfile.NamedTemporaryFile(*args,**kwargs).name
+    f = tempfile.NamedTemporaryFile(*args,**kwargs)
+    name = f.name
+    f.close()
+    return name
 
 def _crlf_terminate(msgfile):
     ''' convenience function to turn a \n terminated file into a \r\n terminated file '''
@@ -342,27 +345,78 @@ def _SMTPsend(msgfile):
         print "SMTP Error: %s: %s" % (k, ret[k])
     return len(ret.keys())
 
+def _get_Messages(folder, msgset):
+    S = _connect()
+    do_or_die(S.select(folder), "Problem changing folders:")
+    msglist = do_or_die(S.search(None, msgset), "Problem with search:")
+    last = None
+    messages = []
+    for num in msglist[0].split():
+        result, data = S.fetch(num, '(RFC822)')
+        messages.append((num, data))
+    S.close()
+    S.logout()
+    return messages
 
-def _quoted_current():
-    pass 
+def _get_curMessage():
+    folder = state['folder'] 
+    try:
+        msgset = state[folder+'.cur']
+    except KeyError:
+        print "Error: No current message selected."
+        raise UsageError()
+    _checkMsgset(msgset)
+    return _get_Messages(folder, msgset)[0][1]
 
+def _quoted_current(data, msg):
+    result = ""
+    for part in msg.walk():
+        _debug("PART %s:" % part.get_content_type())
+        for line in part.get_payload(decode=True).split("\n"):
+            result += "> " + line + "\n"
+    return result 
+
+def __header(data, msg, header):
+    if header in msg:
+        return msg[header]
+    else:
+        return "[[Missing %s header]]" % header
+
+def _header_from(data, msg): return __header(data, msg, 'from')
+def _header_date(data, msg): return __header(data, msg, 'date')
+def _header_subject(data, msg): return __header(data, msg, 'subject')
+
+def _header_from_name(data, msg):
+    full = _header_from(data, msg)
+    left = full.find("<")
+    right = full.find(">")
+    if left > -1 and right > -1:
+        return full[:left] + full[right+1:]
+    else:
+        return full
 
 macros = { 
-    '###QUOTED###': _quoted_current
+    '###QUOTED###': _quoted_current,
+    '###:FROM###':_header_from,
+    '###:DATE###':_header_date,
+    '###:SUBJECT###':_header_subject,
+    '###:FROM.NAME###':_header_from_name,
 }
 
 def _template_update(msgfile):
-    tmpfile = tempFileName(prefix="mhi-pre-template-")
-    import shutil
-    shutil.move(msgfile, tmpfile)
+    import email
+    template = open(msgfile, 'r')
+    templatetext = template.readlines()
     outfile = open(msgfile, "w")
-    for line in tmpfile:
+    curdata = _get_curMessage()
+    curmsg = email.message_from_string(curdata[0][1])
+    for line in templatetext:
         replacements = 1
     	while replacements:
             replacements = 0
-            for macro, impl in macros:
+            for macro, impl in macros.items():
                 if macro in line:
-	            line = line.replace(macro, impl())
+	            line = line.replace(macro, impl(curdata, curmsg))
                     replacements += 1
         outfile.write(line)
     outfile.close()
@@ -647,28 +701,38 @@ def _headers_from(msg):
             return result
     return result
 
-
-def _show(folder, msgset):
-    '''common code for show/next/prev'''
+def _msg_output(folder, msgset, outputfunc):
     import email
-    enable_pager()
     S = _connect()
     do_or_die(S.select(folder), "Problem changing folders:")
     msglist = do_or_die(S.search(None, msgset), "Problem with search:")
     last = None
     for num in msglist[0].split():
         result, data = S.fetch(num, '(RFC822)')
-        print "(Message %s:%s)" % (folder, num)
+        outputfunc("(Message %s:%s)\n" % (folder, num))
+        outputfunc(_headers_from(data[0][1]))
         msg = email.message_from_string(data[0][1])
-        print _headers_from(data[0][1])
         for part in msg.walk():
             _debug("PART %s:" % part.get_content_type())
-            print part.get_payload(decode=True)
+            outputfunc(part.get_payload(decode=True))
         last = num
     S.close()
     S.logout()
     return last
 
+def _show(folder, msgset):
+    '''common code for show/next/prev'''
+    import email
+    enable_pager()
+    messages = _get_Messages(folder, msgset)
+    for num, data in messages:
+        print "(Message %s:%s)\n" % (folder, num)
+        print _headers_from(data[0][1])
+        msg = email.message_from_string(data[0][1])
+        for part in msg.walk():
+            _debug("PART %s:" % part.get_content_type())
+            print part.get_payload(decode=True)
+    return messages[-1][0]
 
 def show(args):
     '''Usage:  show [<messageset>]
