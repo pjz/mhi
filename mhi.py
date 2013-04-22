@@ -825,9 +825,10 @@ def scan(args):
         _debug("env_sender: %s" % repr(env_sender))
         _debug("flags: %s" % repr(flags))
         try:
-            dt = time.strptime(' '.join(str(env_date).split()[:5]), "%a, %d %b %Y %H:%M:%S ")
+            dt = time.strptime(' '.join(str(env_date).split()[:5]), "%a, %d %b %Y %H:%M:%S")
             outtime = time.strftime("%m/%d", dt)
-        except:
+        except e:
+            _debug("strptime exception: " + repr(e))
             outtime = "??/??"
         if type(env_from) == type([]):
             outfrom = str(env_from[0][0])
