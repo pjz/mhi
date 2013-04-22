@@ -34,9 +34,16 @@ config = ConfigObj(infile="%s/.mhirc" % cfgdir, create_empty=True)
 state = ConfigObj(infile="%s/.mhistate" % cfgdir, create_empty=True)
 Debug = 0
 
-def _debug(dstr):
-    if Debug > 0:
-        print "DEBUG: %s" % dstr
+def _debug_noop(*args):
+    pass
+
+def _debug_stdout(arg):
+    f = arg
+    if type(arg) == type(''):
+        f = lambda : arg
+    print("DEBUG: ", f())
+
+_debug = _debug_noop
 
 def sexpr_readsexpr(s):
     import sexpr
@@ -209,7 +216,7 @@ def _connect():
                 'imaps': imaplib.IMAP4_SSL, 
                 'stream': imaplib.IMAP4_stream }
     scheme, netloc, path, _, _, _ = urlparse.urlparse(config['connection'])
-    _debug('scheme: %s netloc: %s path: %s' % (scheme, netloc, path))
+    _debug(lambda : 'scheme: %s netloc: %s path: %s' % (scheme, netloc, path))
     if netloc:
         if '@' in netloc:
             userpass, hostport = netloc.rsplit('@', 1)
@@ -226,12 +233,12 @@ def _connect():
             user, passwd = userpass.split(':', 1)
         else:
             user, passwd = os.environ.get('USER',''), userpass
-        _debug("%s connection to %s : %s @ %s : %s" % (scheme, user, passwd, host, port))
+        _debug(lambda : "%s connection to %s : %s @ %s : %s" % (scheme, user, passwd, host, port))
         session = schemes[scheme](host, int(port))
         session.login(user, passwd)
     else:
         session = schemes[scheme](path)
-    session.debug = Debug
+    session.debug = 0 if _debug == _debug_noop else 4
     return session
 
 def enable_pager():
@@ -327,7 +334,7 @@ def _SMTPsend(msgfile):
     msg = email.message_from_file(file(msgfile,"r"))
     fromaddr = msg.get('From','')
     toaddrs = msg.get_all('To',[])
-    _debug("composing message from %s to %s" % (repr(fromaddr), repr(toaddrs)))
+    _debug(lambda: "composing message from %s to %s" % (repr(fromaddr), repr(toaddrs)))
     server = smtplib.SMTP('localhost')
     #server.set_debuglevel(1)
     try:
@@ -371,7 +378,7 @@ def _get_curMessage():
 def _quoted_current(data, msg):
     result = ""
     for part in msg.walk():
-        _debug("PART %s:" % part.get_content_type())
+        _debug(lambda: "PART %s:" % part.get_content_type())
         for line in part.get_payload(decode=True).split("\n"):
             result += "> " + line + "\n"
     return result 
@@ -472,7 +479,7 @@ def repl(args):
 
 def _selectOrCreate(S, folder):
     result, data = S.select(folder)
-    _debug(" Result: %s, %s " % (result, data))
+    _debug(lambda: " Result: %s, %s " % (result, data))
     if result != 'OK':
         print "Folder '%s' doesn't exist.  Create it? " % folder,
         answer = sys.stdin.readline().strip().lower()
@@ -515,11 +522,11 @@ def folders(args):
     HEADER = "FOLDER"
     S = _connect()
     result, flist = S.list()
-    _debug(" flist: %s " % repr(flist))
+    _debug(lambda: " flist: %s " % repr(flist))
     stats = {}
     for fline in flist:
         f = str(readsexpr('('+fline+')')[2])
-        _debug(" f: %s " % repr(f))
+        _debug(lambda: " f: %s " % repr(f))
         result, data = S.status(f, '(MESSAGES RECENT UNSEEN)')
         if result == 'OK':
             stats[f] = readsexpr('('+data[0]+')')[1]
@@ -529,10 +536,10 @@ def folders(args):
     folderlist.sort()
     totalmsgs, totalnew = 0, 0
     for folder in [HEADER]+folderlist:
-        _debug(" folder: %s " % repr(folder))
+        _debug(lambda: " folder: %s " % repr(folder))
         iscur = [' ', '*'][ folder == state['folder'] ]
         foo = stats[folder]
-        _debug("  Stats: %s " % repr(foo))
+        _debug(lambda: "  Stats: %s " % repr(foo))
         messages, recent, unseen = foo[1], foo[3], foo[5]
         cur = state.get(folder+'.cur', ['-', 'CUR'][ folder == HEADER ])
         print "%s%-20s %7s %7s %7s %7s" % (iscur, folder_name(folder), cur, messages, recent, unseen)
@@ -559,7 +566,7 @@ def pick(args):
     S = _connect()
     do_or_die(S.select(state['folder']), "Problem changing to folder:")
     data = do_or_die(S.search(None, searchstr), "Problem with search criteria:")
-    _debug("data: %s" % repr(data))
+    _debug(lambda: "data: %s" % repr(data))
     S.close()
     S.logout()
     data = [d for d in data if d != '']
@@ -617,7 +624,7 @@ def rmf(args):
         raise UsageError()
     S = _connect()
     result, data = S.select(folder)
-    _debug(" Result: %s, %s " % (result, data))
+    _debug(lambda: " Result: %s, %s " % (result, data))
     if result != 'OK':
         print "Folder '%s' doesn't exist." % folder
     else:
@@ -682,7 +689,7 @@ def mr(args):
     S = _connect()
     do_or_die(S.select(folder), "Problem changing folders:")
     data = do_or_die(S.search(None, msgset), "Problem with search:")
-    _debug("data: %s" % repr(data))
+    _debug(lambda: "data: %s" % repr(data))
     do_or_die(S.store(msgset, '+FLAGS', '\\Seen'), "Problem setting read flag: ")
     S.close()
     S.logout()
@@ -713,7 +720,7 @@ def _msg_output(folder, msgset, outputfunc):
         outputfunc(_headers_from(data[0][1]))
         msg = email.message_from_string(data[0][1])
         for part in msg.walk():
-            _debug("PART %s:" % part.get_content_type())
+            _debug(lambda: "PART %s:" % part.get_content_type())
             outputfunc(part.get_payload(decode=True))
         last = num
     S.close()
@@ -730,7 +737,7 @@ def _show(folder, msgset):
         print _headers_from(data[0][1])
         msg = email.message_from_string(data[0][1])
         for part in msg.walk():
-            _debug("PART %s:" % part.get_content_type())
+            _debug(lambda: "PART %s:" % part.get_content_type())
             print part.get_payload(decode=True)
     return messages[-1][0]
 
@@ -799,8 +806,8 @@ def scan(args):
     try:
         result, data = S.fetch(msgset, '(ENVELOPE FLAGS)')
     except: pass
-    _debug('result: %s' % repr(result))
-    _debug('data: %s' % repr(data))
+    _debug(lambda: 'result: %s' % repr(result))
+    _debug(lambda: 'data: %s' % repr(data))
     do_or_die([result, data], "Problem with fetch:" )
     # take out fake/ba hits
     data = [ hit for hit in data if hit and ' ' in hit ]
@@ -812,23 +819,23 @@ def scan(args):
     except:
         cur = None
     for hit in data:
-        _debug('Hit: %s' % (repr(hit)))
+        _debug(lambda: 'Hit: %s' % (repr(hit)))
         num, e = hit.split(' ',1)
         num = string.atoi(num)
-        _debug("e: %s" % repr(e))
+        _debug(lambda: "e: %s" % repr(e))
         e = readsexpr(e)
         env_date, env_subject, env_from, env_sender = e[1][:4]
         flags = [str(f) for f in e[3]]
-        _debug("env_date: %s" % repr(env_date))
-        _debug("env_subject: %s" % repr(env_subject))
-        _debug("env_from: %s" % repr(env_from))
-        _debug("env_sender: %s" % repr(env_sender))
-        _debug("flags: %s" % repr(flags))
+        _debug(lambda: "env_date: %s" % repr(env_date))
+        _debug(lambda: "env_subject: %s" % repr(env_subject))
+        _debug(lambda: "env_from: %s" % repr(env_from))
+        _debug(lambda: "env_sender: %s" % repr(env_sender))
+        _debug(lambda: "flags: %s" % repr(flags))
         try:
             dt = time.strptime(' '.join(str(env_date).split()[:5]), "%a, %d %b %Y %H:%M:%S")
             outtime = time.strftime("%m/%d", dt)
         except e:
-            _debug("strptime exception: " + repr(e))
+            _debug(lambda: "strptime exception: " + repr(e))
             outtime = "??/??"
         if type(env_from) == type([]):
             outfrom = str(env_from[0][0])
@@ -856,8 +863,8 @@ def scan(args):
 
 
 def debug(args):
-    global Debug
-    Debug = 4    
+    global _debug
+    _debug = _debug_stdout
     _dispatch([sys.argv[0]]+args) 
 
 def help(args):
@@ -907,16 +914,16 @@ def _dispatch(args):
         bar.sort()
         return bar
 
-    _debug("args: %s" % repr(args))
+    _debug(lambda: "args: %s" % repr(args))
     if len(args) > 1:
         cmd = args[1]
-        _debug("cmd: %s" % cmd)
+        _debug(lambda: "cmd: %s" % cmd)
         cmdargs = args[2:]
-        _debug("cmdargs: %s" % cmdargs)
-        _debug("commands: %s" % Commands)
+        _debug(lambda: "cmdargs: %s" % cmdargs)
+        _debug(lambda: "commands: %s" % Commands)
         cmdfunc = Commands.get(cmd,None)
         if cmdfunc:
-            _debug("cmdfunc: %s" % cmdfunc)
+            _debug(lambda: "cmdfunc: %s" % cmdfunc)
             try:
                 cmdfunc(cmdargs)
             except IOError: pass
