@@ -261,22 +261,25 @@ def do_or_die(func, msgstr):
     return data
 
 def _fixupMsgset(msgset):
-    ''' Change some common symbols into an IMAP-style msgset '''
-    # s/cur/$cur/, s/last/$last/, s/prev/$prev/, s/next/$next/
+    ''' Change some common symbols into an IMAP-style msgset:
+        'cur' -> remembered folder current msg
+        'prev' -> remembered folder current msg - 1
+        'next' -> remembered folder current msg + 1
+        'last' -> '*'
+        '$' -> '*'
+        '-' -> ':'
+    '''
     cur = state.get(state['folder']+'.cur', None)
     if cur == 'None': cur = None
     if cur is not None:
-        #print "DEBUG: cur is %s" % repr(cur)
-        #print "DEBUG: type(cur) is %s" % repr(type(cur))
+        _debug(lambda: "cur is " + repr(cur))
+        _debug(lambda: "type(cur) is %s" % repr(type(cur)))
         msgset = msgset.replace('cur', cur)
         # XXX: bounds-check these?
         msgset = msgset.replace('next', str(int(cur)+1))
         msgset = msgset.replace('prev', str(int(cur)-1))
     else:
-        requiresCur = False
-        for dep in ["cur", "prev", "next"]:
-            requiresCur = requiresCur or dep in msgset
-        if requiresCur:
+        if any(True for dep in ["cur", "prev", "next"] if dep in msgset):
             print "No current message, so '%s' makes no sense." % msgset
             sys.exit(1)
     msgset = msgset.replace('-', ':')
@@ -790,6 +793,40 @@ def scan(args):
     Show a list of the specified messages (or all if unspecified)
     in the specified folder, or the current folder if not specified
     '''
+
+    def summarize_envelope(env_date, env_from, env_sender, flags):
+        _debug(lambda: "env_date: %s" % repr(env_date))
+        _debug(lambda: "env_from: %s" % repr(env_from))
+        _debug(lambda: "env_sender: %s" % repr(env_sender))
+        _debug(lambda: "flags: %s" % repr(flags))
+        try:
+            fmt = "%d %b %Y %H:%M:%S"
+            if ',' in env_date:
+                fmt = "%a, " + fmt
+            env_date = ' '.join(str(env_date).split()[:len(fmt.split())])
+            dt = time.strptime(env_date, fmt)
+            outtime = time.strftime("%m/%d", dt)
+        except Exception, e:
+            _debug(lambda: "strptime exception: " + repr(e))
+            outtime = "??/??"
+        if type(env_from) == type([]):
+            outfrom = str(env_from[0][0])
+            if outfrom == 'NIL':
+                outfrom = "%s@%s" % (env_from[0][2], env_from[0][3])
+        else:
+            outfrom = "<Unknown>"
+        if cur == num:
+            status = '>'
+        elif 'Answered' in flags:
+            status = 'r'
+        elif 'Seen' in flags:
+            status = ' '
+        elif 'Recent' in flags:
+            status = 'N'
+        else:
+            status = 'O'
+        return '%4s %s %s %-18s '% (num, status, outtime, outfrom[:18])
+
     enable_pager()
     subjlen = 47
     if len(args) > 99:
@@ -797,9 +834,7 @@ def scan(args):
     # find any folder refs and put together the msgset string
     folder, arglist = _argFolder(args, state['folder'])
     state['folder'] = folder
-    msgset = _fixupMsgset(' '.join(arglist))
-    if not msgset:
-        msgset = "1:*"
+    msgset = _fixupMsgset(' '.join(arglist)) or "1:*"
     _checkMsgset(msgset)
     S = _connect()
     do_or_die(S.select(folder), "Problem changing to folder:" )
@@ -809,7 +844,7 @@ def scan(args):
     _debug(lambda: 'result: %s' % repr(result))
     _debug(lambda: 'data: %s' % repr(data))
     do_or_die([result, data], "Problem with fetch:" )
-    # take out fake/ba hits
+    # take out fake/bad hits
     data = [ hit for hit in data if hit and ' ' in hit ]
     if data == [] or data[0] is None:
         print "No messages."
@@ -824,40 +859,13 @@ def scan(args):
         num = string.atoi(num)
         _debug(lambda: "e: %s" % repr(e))
         e = readsexpr(e)
-        env_date, env_subject, env_from, env_sender = e[1][:4]
+        env_date, env_subj, env_from, env_sender = e[1][:4]
+        _debug(lambda: "env_subj: %s" % repr(env_subj))
         flags = [str(f) for f in e[3]]
-        _debug(lambda: "env_date: %s" % repr(env_date))
-        _debug(lambda: "env_subject: %s" % repr(env_subject))
-        _debug(lambda: "env_from: %s" % repr(env_from))
-        _debug(lambda: "env_sender: %s" % repr(env_sender))
-        _debug(lambda: "flags: %s" % repr(flags))
-        try:
-            dt = time.strptime(' '.join(str(env_date).split()[:5]), "%a, %d %b %Y %H:%M:%S")
-            outtime = time.strftime("%m/%d", dt)
-        except e:
-            _debug(lambda: "strptime exception: " + repr(e))
-            outtime = "??/??"
-        if type(env_from) == type([]):
-            outfrom = str(env_from[0][0])
-            if outfrom == 'NIL':
-                outfrom = "%s@%s" % (env_from[0][2], env_from[0][3])
-        else:
-            outfrom = "<Unknown>"
-        outsubj = str(env_subject)
-        if outsubj == 'NIL':
-            outsubj = "<no subject>"
-        if cur == num:
-            status = '>'
-        elif 'Answered' in flags:
-            status = 'r'
-        elif 'Seen' in flags:
-            status = ' '
-        elif 'Recent' in flags:
-            status = 'N'
-        else:
-            status = 'O'
-        outline = '%4s %s %s %-18s '% (num, status, outtime, outfrom[:18])
-        print outline + outsubj[:subjlen]
+
+        outenv = summarize_envelope(env_date, env_from, env_sender, flags)
+        outsubj = str(env_subj) if str(env_subj) != "NIL" else "<no subject>"
+        print outenv + outsubj[:subjlen]
     S.close()
     S.logout()
 
