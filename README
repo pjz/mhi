@@ -1,8 +1,7 @@
-
 MHI
 ---
 
-mhi is a comamndline style mailreader in the tradition of mh and nmh,
+mhi is a commandline style mailreader in the tradition of mh and nmh,
 but mutated to support IMAP.
 
 Why?
