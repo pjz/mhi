@@ -24,10 +24,5 @@ TODO:
  * use getopt
  * more help - should be self-documenting ala svn/cvs
 
-License:
---------
-
- mhi is licensed under either the GPL v2 or a Creative Commons
-share-alike license. Share and enjoy.
-
+Licensing information is in the LICENSE file. (short version: GPLv3 or CCBYSA)
 
