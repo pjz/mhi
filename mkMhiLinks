@@ -6,7 +6,14 @@ if [ "x$destdir" = "x" ]; then
     exit 1;
 fi
 
+cp mhi.py $destdir
+cp configobj.py $destdir
 cp mhiWrap $destdir
 ( cd $destdir
-  mhi | sed 's/^.*: //' | tr -s ', ' '\n' | xargs -n 1 ln -s mhiWrap
+  sed -e "s,DESTDIR,$destdir,g" $destdir/mhiWrap > mhiWrap.new
+  mv mhiWrap.new mhiWrap
+  chmod +x mhiWrap
+  ln -s mhi.py mhi
+  ./mhi | sed 's/^.*: //' | tr -s ', ' '\n' | xargs -n 1 ln -s mhiWrap
 )
+
