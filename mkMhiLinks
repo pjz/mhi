@@ -9,6 +9,7 @@ fi
 cp mhi.py $destdir
 cp configobj.py $destdir
 cp mhiWrap $destdir
+cp readlisp.py $destdir
 ( cd $destdir
   sed -e "s,DESTDIR,$destdir,g" $destdir/mhiWrap > mhiWrap.new
   mv mhiWrap.new mhiWrap
