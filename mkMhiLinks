@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 destdir=$1
 if [ "x$destdir" = "x" ]; then
@@ -6,15 +6,29 @@ if [ "x$destdir" = "x" ]; then
     exit 1;
 fi
 
-cp mhi.py $destdir
-cp configobj.py $destdir
-cp mhiWrap $destdir
-cp readlisp.py $destdir
-( cd $destdir
-  sed -e "s,DESTDIR,$destdir,g" $destdir/mhiWrap > mhiWrap.new
+doLinks () {
+  cp mhi.py $destdir
+  cp configobj.py $destdir
+  cp mhiWrap $destdir
+  cp readlisp.py $destdir
+  cd $destdir
+  sed -e "s,DESTDIR,$destdir,g" mhiWrap > mhiWrap.new
   mv mhiWrap.new mhiWrap
   chmod +x mhiWrap
   ln -s mhi.py mhi
   ./mhi | sed 's/^.*: //' | tr -s ', ' '\n' | xargs -n 1 ln -s mhiWrap
-)
+}
 
+if [ -d "$destdir" ] ; then
+  doLinks
+else
+  if [ -f "$destdir" ] ; then
+    rm -f $destdir
+  fi
+
+  mkdir -p $destdir
+
+  if [ -d "$destdir" ] ; then
+    doLinks
+  fi
+fi
