@@ -7,28 +7,22 @@ if [ "x$destdir" = "x" ]; then
 fi
 
 doLinks () {
-  cp mhi.py $destdir
-  cp configobj.py $destdir
-  cp mhiWrap $destdir
-  cp readlisp.py $destdir
+  cp mhi.py configobj.py readlisp.py $destdir
+  sed -e "s,DESTDIR,$destdir,g" mhiWrap > $destdir/mhiWrap
   cd $destdir
-  sed -e "s,DESTDIR,$destdir,g" mhiWrap > mhiWrap.new
-  mv mhiWrap.new mhiWrap
   chmod +x mhiWrap
   ln -s mhi.py mhi
   ./mhi | sed 's/^.*: //' | tr -s ', ' '\n' | xargs -n 1 ln -s mhiWrap
 }
 
-if [ -d "$destdir" ] ; then
-  doLinks
-else
+if [ ! -d "$destdir" ]; then
   if [ -f "$destdir" ] ; then
     rm -f $destdir
   fi
-
   mkdir -p $destdir
-
-  if [ -d "$destdir" ] ; then
-    doLinks
-  fi
 fi
+
+if [ -d "$destdir" ] ; then
+  doLinks
+fi
+
