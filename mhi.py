@@ -209,6 +209,13 @@ def _argFolder(args, default=None):
 
     return folder, outargs
 
+def takesFolderArg(f):
+    def parseFolderArg(args):
+        folder, outargs = _argFolder(args)
+        return f(folder, outargs)
+    return parseFolderArg
+
+
 def _connect():
     ''' Convenience connection creation function '''
     import urlparse
@@ -499,14 +506,14 @@ def folder_name(folder):
         return folder[len(prefix):]
     return folder
 
-def folder(args):
+@takesFolderArg
+def folder(folder, arglist):
     '''Usage: folder [+<foldername>]
 
     Change folders / show current folder
     '''
-    folder, arglist = _argFolder(args, state['folder'])
-    if arglist:
-        raise UsageError()
+    if arglist: raise UsageError()
+    if folder is None: folder = state['folder']
     S = _connect()
     data = _selectOrCreate(S, folder)
     S.close()
@@ -551,20 +558,19 @@ def folders(args):
             totalnew += int(unseen)
     print "TOTAL: %d messages (%d new) in %d folders" % (totalmsgs, totalnew, len(folderlist))
 
-
-def pick(args):
+@takesFolderArg
+def pick(folder, arglist):
     '''Usage: pick <search criteria> [+folder]
 
     Return a message-set that matches the search criteria.
     Criteria are based on the IMAP spec search string.
     A summary of the IMAP spec is available by calling 'pick' with --help as its only option.
     '''
-    if not args:
-        raise UsageError()
-    if len(args) == 1 and args[0] == "--help":
+    if not arglist: raise UsageError()
+    if len(arglist) == 1 and arglist[0] == "--help":
         print PickDocs
         sys.exit(1)
-    state['folder'], arglist = _argFolder(args, state['folder'])
+    if folder is not None: state['folder'] = folder
     searchstr = '('+' '.join(arglist)+')'
     S = _connect()
     do_or_die(S.select(state['folder']), "Problem changing to folder:")
@@ -581,15 +587,13 @@ def pick(args):
     else:
         print "0"
 
-
-def refile(args):
+@takesFolderArg
+def refile(destfolder, arglist):
     '''Usage: refile <messageset> +<folder>
 
     Moves a set of messages from the current folder to a new one.
     '''
-    if not args:
-        raise UsageError()
-    destfolder, arglist = _argFolder(args)
+    if not arglist: raise UsageError()
     if destfolder is None:
         print "Error: Destination folder must be specified."
         raise UsageError()
@@ -618,13 +622,12 @@ def refile(args):
     S.logout()
     print "Done."
 
-def rmf(args):
+@takesFolderArg
+def rmf(folder, arglist):
     '''Usage:  rmf +<foldername>
     remove a folder
     '''
-    folder, arglist = _argFolder(args)
-    if not folder:
-        raise UsageError()
+    if not folder: raise UsageError()
     S = _connect()
     result, data = S.select(folder)
     _debug(lambda: " Result: %s, %s " % (result, data))
@@ -642,7 +645,8 @@ def rmf(args):
     else:
         print "Failed to delete folder '%s': %s" % (folder, data)
 
-def rmm(args):
+@takesFolderArg
+def rmm(folder, arglist):
     '''Usage: rmm [+folder] <messageset>
 
     ie: rmm +INBOX 1
@@ -651,8 +655,7 @@ def rmm(args):
     Remove the specified messages (or the current message if unspecified)  
     from the specified folder (or the current folder if unspecified).
     '''
-    folder, arglist = _argFolder(args, state['folder'])
-    state['folder'] = folder
+    folder = state['folder'] = folder or state['folder']
     msgset = _fixupMsgset(' '.join(arglist))
     if not msgset:
         try:
@@ -673,14 +676,14 @@ def rmm(args):
     # TODO: fix this
     state[folder+'.cur'] = first
 
-def mr(args):
+@takesFolderArg
+def mr(folder, arglist):
     '''Usage: mr [+folder] <messageset>
 
     Mark the specified messages (or the current message if unspecified)
     from the specified folder (or the current folder if unspecified) as read.
     '''
-    folder, arglist = _argFolder(args, state['folder'])
-    state['folder'] = folder
+    folder = state['folder'] = folder or state['folder']
     msgset = _fixupMsgset(' '.join(arglist))
     if not msgset:
         try:
@@ -744,13 +747,13 @@ def _show(folder, msgset):
             print part.get_payload(decode=True)
     return messages[-1][0]
 
-def show(args):
+@takesFolderArg
+def show(folder, arglist):
     '''Usage:  show [<messageset>]
 
     Show the specified messages, or the current message if none specified
     '''
-    folder, arglist = _argFolder(args, state['folder'])
-    state['folder'] = folder
+    folder = state['folder'] = folder or state['folder']
     msgset = _fixupMsgset(' '.join(arglist))
     if not msgset:
         try:
@@ -762,13 +765,13 @@ def show(args):
     state[folder+'.cur'] = _show(folder, msgset)
 
 # TODO: needs better bounds checking
-def next(args):
+@takesFolderArg
+def next(folder, arglist):
     '''Usage: next [+<folder>]
 
     Show the next message in the specified folder, or the current folder if not specified
     '''
-    folder, arglist = _argFolder(args, state['folder'])
-    state['folder'] = folder
+    folder = state['folder'] = folder or state['folder']
     try:
         cur = int(state[folder+'.cur']) + 1
     except KeyError:
@@ -776,19 +779,20 @@ def next(args):
     state[folder+'.cur'] = _show(folder, str(cur))
 
 # TODO: needs better bounds checking
-def prev(args):
+@takesFolderArg
+def prev(folder, arglist):
     '''Usage: prev [+<folder>]
     Show the previous message in the specified folder, or the current folder if not specified
     '''
-    folder, arglist = _argFolder(args, state['folder'])
-    state['folder'] = folder
+    folder = state['folder'] = folder or state['folder']
     try:
         cur = int(state[folder+'.cur']) - 1
     except KeyError:
         cur = 1
     state[folder+'.cur'] = _show(folder, str(cur))
 
-def scan(args):
+@takesFolderArg
+def scan(folder, arglist):
     '''Usage: scan [+<folder>] [messageset]
     Show a list of the specified messages (or all if unspecified)
     in the specified folder, or the current folder if not specified
@@ -829,10 +833,10 @@ def scan(args):
 
     enable_pager()
     subjlen = 47
-    if len(args) > 99:
+    if len(arglist) > 99:
         raise UsageError()
     # find any folder refs and put together the msgset string
-    folder, arglist = _argFolder(args, state['folder'])
+    folder = state['folder'] = folder or state['folder']
     state['folder'] = folder
     msgset = _fixupMsgset(' '.join(arglist)) or "1:*"
     _checkMsgset(msgset)
