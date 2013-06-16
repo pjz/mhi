@@ -1,4 +1,4 @@
-#!/usr/bin/python2.6
+#!/usr/bin/env python
 #
 # Goal: MH-ish commands that will talk to an IMAP server
 #
