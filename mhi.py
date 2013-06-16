@@ -286,8 +286,9 @@ def enable_pager():
        if pager is not None:
            sys.stdout = os.popen(pager, 'w')
 
-def _fixupMsgset(msgset):
-    ''' Change some common symbols into an IMAP-style msgset:
+def msgset_from(arglist):
+    ''' turn a list of numbers into a valid msgset:
+        Change some common symbols into an IMAP-style msgset:
         'cur' -> remembered folder current msg
         'prev' -> remembered folder current msg - 1
         'next' -> remembered folder current msg + 1
@@ -295,6 +296,7 @@ def _fixupMsgset(msgset):
         '$' -> '*'
         '-' -> ':'
     '''
+    msgset = ' '.join(arglist)
     cur = state.get(state['folder']+'.cur', None)
     if cur == 'None': cur = None
     if cur is not None:
@@ -313,6 +315,7 @@ def _fixupMsgset(msgset):
     msgset = msgset.replace('last', "*")
     msgset = msgset.replace('$', "*")
     return msgset 
+
 
 def _checkMsgset(msgset):
     '''Stub to check that a specified string has the grammar of a msgset'''
@@ -615,7 +618,7 @@ def refile(destfolder, arglist):
         print "Error: Destination folder must be specified."
         raise UsageError()
     srcfolder = state["folder"]
-    msgset = _fixupMsgset(' '.join(arglist)) or _cur_msg(srcfolder)
+    msgset = msgset_from(arglist) or _cur_msg(srcfolder)
     _checkMsgset(msgset)
     with Connection() as S:
         _selectOrCreate(S, destfolder)
@@ -663,7 +666,7 @@ def rmm(folder, arglist):
     from the specified folder (or the current folder if unspecified).
     '''
     folder = state['folder'] = folder or state['folder']
-    msgset = _fixupMsgset(' '.join(arglist)) or _cur_msg(folder)
+    msgset = msgset_from(arglist) or _cur_msg(folder)
     _checkMsgset(msgset)
     with Connection() as S:
         S.select(folder, errmsg = "Problem changing folders:")
@@ -683,7 +686,7 @@ def mr(folder, arglist):
     from the specified folder (or the current folder if unspecified) as read.
     '''
     folder = state['folder'] = folder or state['folder']
-    msgset = _fixupMsgset(' '.join(arglist)) or _cur_msg(folder)
+    msgset = msgset_from(arglist) or _cur_msg(folder)
     _checkMsgset(msgset)
     with Connection() as S:
         S.select(folder, errmsg = "Problem changing folders:")
@@ -742,7 +745,7 @@ def show(folder, arglist):
     Show the specified messages, or the current message if none specified
     '''
     folder = state['folder'] = folder or state['folder']
-    msgset = _fixupMsgset(' '.join(arglist)) or _cur_msg(folder)
+    msgset = msgset_from(arglist) or _cur_msg(folder)
     _checkMsgset(msgset)
     state[folder+'.cur'] = _show(folder, msgset)
 
@@ -820,7 +823,7 @@ def scan(folder, arglist):
     # find any folder refs and put together the msgset string
     folder = state['folder'] = folder or state['folder']
     state['folder'] = folder
-    msgset = _fixupMsgset(' '.join(arglist)) or "1:*"
+    msgset = msgset_from(arglist) or "1:*"
     _checkMsgset(msgset)
     with Connection() as S:
         S.select(folder, errmsg = "Problem changing to folder:" )
