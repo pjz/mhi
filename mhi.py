@@ -247,22 +247,23 @@ class Connection:
         session.debug = 0 if _debug == _debug_noop else 4
         self.session = session
 
-        def __enter__(self):
-            return self
+    def __enter__(self):
+        return self
 
-        def __exit__(self):
-            self.session.close()
-            self.session.logout()
+    def __exit__(self, *args):
+	_debug('Exit args are: ' + repr(args))
+        self.session.close()
+        self.session.logout()
 
-        def __getattr__(self, name):
-            raw = False
-            if name.startswith('raw_'):
-                raw = True
-                name = name[4:]
-            result = getattr(self.session, name)
-            if result is None: raise AttributeError
-            if raw: return result
-            return die_on_error(result)
+    def __getattr__(self, name):
+        raw = False
+        if name.startswith('raw_'):
+            raw = True
+            name = name[4:]
+        result = getattr(self.session, name)
+        if result is None: raise AttributeError
+        if raw: return result
+        return die_on_error(result)
 
 def die_on_error(f):
     def _die_on_err_wrapper(*args, **kwargs):
@@ -575,6 +576,25 @@ def folders(args):
             totalnew += int(unseen)
     print "TOTAL: %d messages (%d new) in %d folders" % (totalmsgs, totalnew, len(folderlist))
 
+def _consolidate(data):
+    '''data is a comma-separated list of numbers; this function adds ranges with a dash'''
+    from itertools import groupby
+    from operator import itemgetter
+
+    _debug(lambda: "consolidate in: " + repr(data))
+
+    str_list = []
+    for k, g in groupby(enumerate(data), lambda (i,x):i-x):
+        ilist = map(itemgetter(1), g)
+	_debug(lambda: "_consolidating: " + repr(ilist))
+	if len(ilist) > 1:
+            str_list.append('%d-%d' % (ilist[0], ilist[-1]+1))
+        else:
+            str_list.append('%d' % ilist[0])
+    result = ','.join(str_list)
+    _debug(lambda: "consolidate out: " + result)
+    return result
+
 @takesFolderArg
 def pick(folder, arglist):
     '''Usage: pick <search criteria> [+folder]
@@ -595,7 +615,10 @@ def pick(folder, arglist):
         _debug(lambda: "data: %s" % repr(data))
     data = [d for d in data if d != '']
     if data:
-        print ','.join( m.split() for m in data )
+        msglist = []
+        for m in data:
+            msglist += [int(i) for i in m.split()]
+        print _consolidate(msglist)
     else:
         print "0"
 
