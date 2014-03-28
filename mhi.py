@@ -19,6 +19,7 @@
 # everything else Copyright Paul Jimenez, released under the GPL
 # canonical copy at http://www.place.org/~pj/software/mhi
 
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import sys
@@ -268,10 +269,11 @@ class Connection:
 def die_on_error(f):
     def _die_on_err_wrapper(*args, **kwargs):
         msgstr = kwargs.get('errmsg', 'There was a problem:')
-        del kwargs['errmsg']
+	if 'errmsg' in kwargs:
+            del kwargs['errmsg']
         result, data = f(*args, **kwargs)
         if result != 'OK':
-            print msgstr + ' ' + str(data)
+            print(msgstr + ' ' + str(data))
             sys.exit(1)
         return data
     return _die_on_err_wrapper
@@ -309,7 +311,7 @@ def msgset_from(arglist):
         msgset = msgset.replace('prev', str(int(cur)-1))
     else:
         if any(True for dep in ["cur", "prev", "next"] if dep in msgset):
-            print "No current message, so '%s' makes no sense." % msgset
+            print("No current message, so '%s' makes no sense." % msgset)
             sys.exit(1)
     msgset = msgset.replace('-', ':')
     msgset = msgset.replace(' ', ',')
@@ -324,7 +326,7 @@ def _checkMsgset(msgset):
     # msgset = int | int:int | msgset,msgset
     # '1', '1:5', '1,2,3', '1,3:5' are all valid
     if len(msgset.strip('1234567890,:*')) != 0:
-        print "%s isn't a valid messageset. Try again." % msgset
+        print("%s isn't a valid messageset. Try again." % msgset)
         sys.exit(1)
 
 def tempFileName(*args,**kwargs):
@@ -373,16 +375,16 @@ def _SMTPsend(msgfile):
     try:
         ret = server.sendmail(fromaddr, toaddrs, msg.as_string())
     except smtplib.SMTPRecipientsRefused:
-        print "No valid recipients. Try again."
+        print("No valid recipients. Try again.")
     except smtplib.SMTPHeloError:
-        print "Error talking to SMTP server (No HELO)."
+        print("Error talking to SMTP server (No HELO).")
     except smtplib.SMTPSenderRefused:
-        print "Error talking to SMTP server (Unacceptable FROM address)."
+        print("Error talking to SMTP server (Unacceptable FROM address).")
     except smtplib.SMTPDataError:
-        print "Error talking to SMTP server (Data Error)."
+        print("Error talking to SMTP server (Data Error).")
     server.quit()
     for k in ret.keys():
-        print "SMTP Error: %s: %s" % (k, ret[k])
+        print("SMTP Error: %s: %s" % (k, ret[k]))
     return len(ret.keys())
 
 def _get_Messages(folder, msgset):
@@ -400,7 +402,7 @@ def _get_curMessage():
     try:
         msgset = state[folder+'.cur']
     except KeyError:
-        print "Error: No current message selected."
+        print("Error: No current message selected.")
         raise UsageError()
     _checkMsgset(msgset)
     return _get_Messages(folder, msgset)[0][1]
@@ -476,7 +478,7 @@ def comp(args):
             os.unlink(tmpfile)
     else:
         # 'abort - throw away session, keep - save it for later'
-        print "Session aborted."
+        print("Session aborted.")
         try:
             os.unlink(tmpfile)
         except:
@@ -504,14 +506,14 @@ def repl(args):
             os.unlink(tmpfile)
     else:
         # 'abort - throw away session, keep - save it for later'
-        print "Session aborted."
+        print("Session aborted.")
         os.unlink(tmpfile)
 
 def _selectOrCreate(S, folder):
     result, data = S.raw_select(folder)
     _debug(lambda: " Result: %s, %s " % (result, data))
     if result != 'OK':
-        print "Folder '%s' doesn't exist.  Create it? " % folder,
+        print("Folder '%s' doesn't exist.  Create it? " % folder,)
         answer = sys.stdin.readline().strip().lower()
         if answer.startswith('y'):
             S.create(folder, errmsg = "Problem creating folder:")
@@ -540,7 +542,7 @@ def folder(folder, arglist):
     state['folder'] = folder
     # inbox+ has 64 messages  (1-64); cur=63; (others).
     cur = state.get(folder+'.cur', 'unset')
-    print "Folder %s has %s messages, cur is %s." % (folder_name(folder), data[0], cur)
+    print("Folder %s has %s messages, cur is %s." % (folder_name(folder), data[0], cur))
 
 def folders(args):
     '''Usage: folders
@@ -570,11 +572,11 @@ def folders(args):
         _debug(lambda: "  Stats: %s " % repr(foo))
         messages, recent, unseen = foo[1], foo[3], foo[5]
         cur = state.get(folder+'.cur', ['-', 'CUR'][ folder == HEADER ])
-        print "%s%-20s %7s %7s %7s %7s" % (iscur, folder_name(folder), cur, messages, recent, unseen)
+        print("%s%-20s %7s %7s %7s %7s" % (iscur, folder_name(folder), cur, messages, recent, unseen))
         if folder != HEADER:
             totalmsgs += int(messages)
             totalnew += int(unseen)
-    print "TOTAL: %d messages (%d new) in %d folders" % (totalmsgs, totalnew, len(folderlist))
+    print("TOTAL: %d messages (%d new) in %d folders" % (totalmsgs, totalnew, len(folderlist)))
 
 def _consolidate(data):
     '''data is a comma-separated list of numbers; this function adds ranges with a dash'''
@@ -605,7 +607,7 @@ def pick(folder, arglist):
     '''
     if not arglist: raise UsageError()
     if len(arglist) == 1 and arglist[0] == "--help":
-        print PickDocs
+        print(PickDocs)
         sys.exit(1)
     if folder is not None: state['folder'] = folder
     searchstr = '('+' '.join(arglist)+')'
@@ -618,15 +620,15 @@ def pick(folder, arglist):
         msglist = []
         for m in data:
             msglist += [int(i) for i in m.split()]
-        print _consolidate(msglist)
+        print(_consolidate(msglist))
     else:
-        print "0"
+        print("0")
 
 def _cur_msg(folder):
     try:
         return state[folder+".cur"]
     except KeyError:
-        print "Error: No message(s) selected."
+        print("Error: No message(s) selected.")
         raise UsageError()
 
 
@@ -638,7 +640,7 @@ def refile(destfolder, arglist):
     '''
     if not arglist: raise UsageError()
     if destfolder is None:
-        print "Error: Destination folder must be specified."
+        print("Error: Destination folder must be specified.")
         raise UsageError()
     srcfolder = state["folder"]
     msgset = msgset_from(arglist) or _cur_msg(srcfolder)
@@ -652,10 +654,10 @@ def refile(destfolder, arglist):
         msgnums = data[0].split()
         for num in msgnums:
             S.raw_store(num, '+FLAGS', '\\Deleted')
-            print ".", 
+            print(".", )
         S.expunge()
-        print "%d messages refiled to '%s'." % (len(msgnums), destfolder)
-    print "Done."
+        print("%d messages refiled to '%s'." % (len(msgnums), destfolder))
+    print("Done.")
 
 @takesFolderArg
 def rmf(folder, arglist):
@@ -667,16 +669,16 @@ def rmf(folder, arglist):
         result, data = S.raw_select(folder)
         _debug(lambda: " Result: %s, %s " % (result, data))
         if result != 'OK':
-            print "Folder '%s' doesn't exist." % folder
+            print("Folder '%s' doesn't exist." % folder)
         else:
             if state['folder'] == folder:
                 state['folder'] = 'INBOX'
             S.select(state['folder'], errmsg = "Problem changing folders:")
             result, data = S.raw_delete(folder)
     if result == 'OK':
-        print "Folder '%s' deleted." % folder
+        print("Folder '%s' deleted." % folder)
     else:
-        print "Failed to delete folder '%s': %s" % (folder, data)
+        print("Failed to delete folder '%s': %s" % (folder, data))
 
 @takesFolderArg
 def rmm(folder, arglist):
@@ -696,7 +698,7 @@ def rmm(folder, arglist):
         data = S.search(None, msgset, errmsg = "Problem with search:")
         S.store(msgset, '+FLAGS', '\\Deleted', errmsg = "Problem setting deleted flag: ")
         S.expunge(errmsg = "Problem expunging deleted messages: ")
-        print "Deleted."
+        print("Deleted.")
     first = data[0].split()[0]
     # TODO: fix this
     state[folder+'.cur'] = first
@@ -753,12 +755,15 @@ def _show(folder, msgset):
     enable_pager()
     messages = _get_Messages(folder, msgset)
     for num, data in messages:
-        print "(Message %s:%s)\n" % (folder, num)
-        print _headers_from(data[0][1])
+        print("(Message %s:%s)\n" % (folder, num))
+        print(_headers_from(data[0][1]))
         msg = email.message_from_string(data[0][1])
         for part in msg.walk():
             _debug(lambda: "PART %s:" % part.get_content_type())
-            print part.get_payload(decode=True)
+            print(part.get_payload(decode=True))
+    if not messages:
+	print("No such message(s).")
+	return
     return messages[-1][0]
 
 @takesFolderArg
@@ -770,7 +775,9 @@ def show(folder, arglist):
     folder = state['folder'] = folder or state['folder']
     msgset = msgset_from(arglist) or _cur_msg(folder)
     _checkMsgset(msgset)
-    state[folder+'.cur'] = _show(folder, msgset)
+    shown = _show(folder, msgset)
+    if shown:
+        state[folder+'.cur'] = shown 
 
 # TODO: needs better bounds checking
 @takesFolderArg
@@ -784,7 +791,9 @@ def next(folder, arglist):
         cur = int(state[folder+'.cur']) + 1
     except KeyError:
         cur = 1
-    state[folder+'.cur'] = _show(folder, str(cur))
+    shown = _show(folder, str(cur))
+    if shown:
+        state[folder+'.cur'] = shown 
 
 # TODO: needs better bounds checking
 @takesFolderArg
@@ -797,7 +806,9 @@ def prev(folder, arglist):
         cur = int(state[folder+'.cur']) - 1
     except KeyError:
         cur = 1
-    state[folder+'.cur'] = _show(folder, str(cur))
+    shown = _show(folder, str(cur))
+    if shown:
+        state[folder+'.cur'] = shown 
 
 @takesFolderArg
 def scan(folder, arglist):
@@ -854,7 +865,7 @@ def scan(folder, arglist):
         # take out fake/bad hits
         data = [ hit for hit in data if hit and ' ' in hit ]
         if data == [] or data[0] is None:
-            print "No messages."
+            print("No messages.")
             sys.exit(0)
         try:
             cur = string.atoi(state[folder+'.cur'])
@@ -872,7 +883,7 @@ def scan(folder, arglist):
 
             outenv = summarize_envelope(env_date, env_from, env_sender, flags)
             outsubj = str(env_subj) if str(env_subj) != "NIL" else "<no subject>"
-            print outenv + outsubj[:subjlen]
+            print(outenv + outsubj[:subjlen])
 
 
 def debug(args):
@@ -891,14 +902,14 @@ def help(args):
         return bar
 
     if len(args) < 1:
-        print help.__doc__
-        print "Valid commands: %s " % (', '.join(_sort(Commands.keys())))
+        print(help.__doc__)
+        print("Valid commands: %s " % (', '.join(_sort(Commands.keys()))))
         sys.exit(0)
     else:
         cmd = args[0]
         cmdfunc = Commands.get(cmd, None)
-        print "Help on %s:\n" % cmd
-        print cmdfunc.__doc__
+        print("Help on %s:\n" % cmd)
+        print(cmdfunc.__doc__)
 
 
 Commands = { 'folders': folders,
@@ -941,14 +952,14 @@ def _dispatch(args):
                 cmdfunc(cmdargs)
             except IOError: pass
             except UsageError:
-                print cmdfunc.__doc__
+                print(cmdfunc.__doc__)
                 sys.exit(1)
             config.write()
             state.write()
         else:        
-            print "Unknown command %s.  Valid ones: %s " % (sys.argv[1], ', '.join(_sort(Commands.keys())))
+            print("Unknown command %s.  Valid ones: %s " % (sys.argv[1], ', '.join(_sort(Commands.keys()))))
     else:
-        print "Must specify a command.  Valid ones: %s " % ', '.join(_sort(Commands.keys()))
+        print("Must specify a command.  Valid ones: %s " % ', '.join(_sort(Commands.keys())))
 
 
 
@@ -958,5 +969,5 @@ if __name__ == '__main__':
     try:
         _dispatch(sys.argv)
     except KeyboardInterrupt:
-        print "Interrupted."
+        print("Interrupted.")
 
