@@ -214,6 +214,7 @@ def takesFolderArg(f):
     def parseFolderArg(args):
         folder, outargs = _argFolder(args)
         return f(folder, outargs)
+    parseFolderArg.__doc__ = f.__doc__
     return parseFolderArg
 
 class Connection:
@@ -394,6 +395,7 @@ def _get_Messages(folder, msgset):
         messages = []
         for num in msglist[0].split():
             result, data = S.fetch(num, '(RFC822)')
+	    _debug(lambda: "Data from message %s : %s" % (num, data))
             messages.append((num, data))
     return messages
 
@@ -552,6 +554,7 @@ def folders(args):
     enable_pager()
     HEADER = "FOLDER"
     with Connection() as S:
+        S.select(state['folder'], errmsg = "Problem changing to folder:")
         result, flist = S.raw_list()
         _debug(lambda: " flist: %s " % repr(flist))
         stats = {}
@@ -664,7 +667,8 @@ def rmf(folder, arglist):
     '''Usage:  rmf +<foldername>
     remove a folder
     '''
-    if not folder: raise UsageError()
+    _debug(lambda: "Folder is %r" % folder)
+    if folder is None: raise UsageError()
     with Connection() as S:
         result, data = S.raw_select(folder)
         _debug(lambda: " Result: %s, %s " % (result, data))
