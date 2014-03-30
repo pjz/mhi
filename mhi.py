@@ -218,7 +218,7 @@ def takesFolderArg(f):
     return parseFolderArg
 
 class Connection:
-    def __init__(self):
+    def __init__(self, startfolder=None):
         import urlparse
         schemes = { 'imap' : imaplib.IMAP4, 
                     'imaps': imaplib.IMAP4_SSL, 
@@ -248,6 +248,10 @@ class Connection:
             session = schemes[scheme](path)
         session.debug = 0 if _debug == _debug_noop else 4
         self.session = session
+	if startfolder is None:
+	    startfolder = state['folder']
+	die_on_error(session.select)(startfolder, errmsg = "Problem changing to folder %s:" % folder)
+        state['folder'] = startfolder
 
     def __enter__(self):
         return self
@@ -266,6 +270,7 @@ class Connection:
         if result is None: raise AttributeError
         if raw: return result
         return die_on_error(result)
+
 
 def die_on_error(f):
     def _die_on_err_wrapper(*args, **kwargs):
@@ -389,13 +394,12 @@ def _SMTPsend(msgfile):
     return len(ret.keys())
 
 def _get_Messages(folder, msgset):
-    with Connection() as S:
-        S.select(folder, errmsg = "Problem changing folders:")
+    with Connection(folder) as S:
         msglist = S.search(None, msgset, errmsg = "Problem with search:")
         messages = []
         for num in msglist[0].split():
-            result, data = S.fetch(num, '(RFC822)')
-	    _debug(lambda: "Data from message %s : %s" % (num, data))
+            result, data = S.fetch(num, '(RFC822)', errmsg="Problem fetching msg %s: " % num)
+	    _debug(lambda: "Data from message %r : %r" % (num, data))
             messages.append((num, data))
     return messages
 
@@ -554,7 +558,6 @@ def folders(args):
     enable_pager()
     HEADER = "FOLDER"
     with Connection() as S:
-        S.select(state['folder'], errmsg = "Problem changing to folder:")
         result, flist = S.raw_list()
         _debug(lambda: " flist: %s " % repr(flist))
         stats = {}
@@ -613,9 +616,9 @@ def pick(folder, arglist):
         print(PickDocs)
         sys.exit(1)
     if folder is not None: state['folder'] = folder
+    else: folder = state['folder']
     searchstr = '('+' '.join(arglist)+')'
-    with Connection() as S:
-        S.select(state['folder'], errmsg = "Problem changing to folder:")
+    with Connection(folder) as S:
         data = S.search(None, searchstr, errmsg = "Problem with search criteria:")
         _debug(lambda: "data: %s" % repr(data))
     data = [d for d in data if d != '']
@@ -650,7 +653,7 @@ def refile(destfolder, arglist):
     _checkMsgset(msgset)
     with Connection() as S:
         _selectOrCreate(S, destfolder)
-        S.select(srcfolder, errmsg = "Problem changing folders:")
+        S.select(srcfolder, errmsg = "Problem changing to folder %s:" % srcfolder)
         S.copy(msgset, destfolder, errmsg = "Problem with copy:")
         data = S.search(None, msgset, errmsg = "Problem with search:")
         print("Refiling... ",)
@@ -677,7 +680,7 @@ def rmf(folder, arglist):
         else:
             if state['folder'] == folder:
                 state['folder'] = 'INBOX'
-            S.select(state['folder'], errmsg = "Problem changing folders:")
+            S.select(state['folder'], errmsg = "Problem changing to folder %s:" % state['folder'])
             result, data = S.raw_delete(folder)
     if result == 'OK':
         print("Folder '%s' deleted." % folder)
@@ -697,8 +700,7 @@ def rmm(folder, arglist):
     folder = state['folder'] = folder or state['folder']
     msgset = msgset_from(arglist) or _cur_msg(folder)
     _checkMsgset(msgset)
-    with Connection() as S:
-        S.select(folder, errmsg = "Problem changing folders:")
+    with Connection(folder) as S:
         data = S.search(None, msgset, errmsg = "Problem with search:")
         S.store(msgset, '+FLAGS', '\\Deleted', errmsg = "Problem setting deleted flag: ")
         S.expunge(errmsg = "Problem expunging deleted messages: ")
@@ -717,8 +719,7 @@ def mr(folder, arglist):
     folder = state['folder'] = folder or state['folder']
     msgset = msgset_from(arglist) or _cur_msg(folder)
     _checkMsgset(msgset)
-    with Connection() as S:
-        S.select(folder, errmsg = "Problem changing folders:")
+    with Connection(folder) as S:
         data = S.search(None, msgset, errmsg = "Problem with search:")
         _debug(lambda: "data: %s" % repr(data))
         S.store(msgset, '+FLAGS', '\\Seen', errmsg = "Problem setting read flag: ")
@@ -729,18 +730,21 @@ def mr(folder, arglist):
 
 def _headers_from(msg):
     result = ""
-    for line in msg.split("\r\n"):
+    for line in msg.split(b"\r\n"):
         if line:
-            result += line + "\n"
+            result += line + b"\n"
         else:
             return result
     return result
 
-def _msg_output(folder, msgset, outputfunc):
+def _show(folder, msgset):
+    '''common code for show/next/prev'''
     import email
-    with Connection() as S:
-        S.select(folder, errmsg = "Problem changing folders:")
+    enable_pager()
+    outputfunc = print
+    with Connection(folder) as S:
         msglist = S.search(None, msgset, errmsg = "Problem with search:")
+	_debug(lambda: "SEARCH returned: %r" % msglist)
         last = None
         for num in msglist[0].split():
             result, data = S.raw_fetch(num, '(RFC822)')
@@ -752,23 +756,6 @@ def _msg_output(folder, msgset, outputfunc):
                 outputfunc(part.get_payload(decode=True))
             last = num
     return last
-
-def _show(folder, msgset):
-    '''common code for show/next/prev'''
-    import email
-    enable_pager()
-    messages = _get_Messages(folder, msgset)
-    for num, data in messages:
-        print("(Message %s:%s)\n" % (folder, num))
-        print(_headers_from(data[0][1]))
-        msg = email.message_from_string(data[0][1])
-        for part in msg.walk():
-            _debug(lambda: "PART %s:" % part.get_content_type())
-            print(part.get_payload(decode=True))
-    if not messages:
-	print("No such message(s).")
-	return
-    return messages[-1][0]
 
 @takesFolderArg
 def show(folder, arglist):
@@ -860,11 +847,9 @@ def scan(folder, arglist):
         raise UsageError()
     # find any folder refs and put together the msgset string
     folder = state['folder'] = folder or state['folder']
-    state['folder'] = folder
     msgset = msgset_from(arglist) or "1:*"
     _checkMsgset(msgset)
-    with Connection() as S:
-        S.select(folder, errmsg = "Problem changing to folder:" )
+    with Connection(folder) as S:
         data = S.fetch(msgset, '(ENVELOPE FLAGS)', errmsg = "Problem with fetch:" )
         # take out fake/bad hits
         data = [ hit for hit in data if hit and ' ' in hit ]
