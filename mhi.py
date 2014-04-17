@@ -596,7 +596,7 @@ def _consolidate(data):
         ilist = map(itemgetter(1), g)
 	_debug(lambda: "_consolidating: " + repr(ilist))
 	if len(ilist) > 1:
-            str_list.append('%d-%d' % (ilist[0], ilist[-1]+1))
+            str_list.append('%d-%d' % (ilist[0], ilist[-1]))
         else:
             str_list.append('%d' % ilist[0])
     result = ','.join(str_list)
