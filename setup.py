@@ -11,7 +11,7 @@ classifiers = [ 'Development Status :: 5 - Production/Stable'
               , 'Environment :: Console'
               , 'Intended Audience :: Developers'
               , 'Intended Audience :: End Users/Desktop'
-              , 'System Administrators'
+              , 'Intended Audience :: System Administrators'
               , 'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)'
               , 'Natural Language :: English'
               , 'Operating System :: MacOS :: MacOS X'
@@ -27,7 +27,7 @@ setup( author = 'Paul Jimenez'
      , classifiers = classifiers
      , description = 'MH for IMAP'
      , name = 'mhi'
-     , url = 'http://github.com/pjz/MHI'
+     , url = 'http://github.com/pjz/mhi'
      , py_modules = [ 'distribute_setup', 'mhi' ]
      , entry_points = { 'console_scripts': [ 'mhi = mhi:main' ]}
      # there must be nothing on the following line after the = other than a string constant
