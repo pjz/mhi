@@ -11,7 +11,7 @@
 #   actually touching the mailboxes.  This will affect the working of
 #   anything that takes a msgset as well as scan, next, prev, and pick
 #
-# handy aliases: 
+# handy aliases:
 #    mailchk - folders with new messages - mhi folders |grep -v " 0$"
 #    nn - show new messages in a folder- mhi scan `mhi pick \Unseen`
 #
@@ -48,7 +48,7 @@ _debug = _debug_noop
 
 def sexpr_readsexpr(s):
     import sexpr
-    return sexpr.SexprParser(StringIO.StringIO(s)).parse()    
+    return sexpr.SexprParser(StringIO.StringIO(s)).parse()
 
 def readlisp_readsexpr(s):
     import readlisp
@@ -56,7 +56,7 @@ def readlisp_readsexpr(s):
 
 readsexpr = readlisp_readsexpr
 
-PickDocs = """ From RFC2060: 
+PickDocs = """ From RFC2060:
       When multiple keys are specified, the result is the intersection
       (AND function) of all the messages that match those keys.  For
       example, the criteria DELETED FROM "SMITH" SINCE 1-Feb-1994 refers
@@ -220,8 +220,8 @@ def takesFolderArg(f):
 class Connection:
     def __init__(self, startfolder=None):
         import urlparse
-        schemes = { 'imap' : imaplib.IMAP4, 
-                    'imaps': imaplib.IMAP4_SSL, 
+        schemes = { 'imap' : imaplib.IMAP4,
+                    'imaps': imaplib.IMAP4_SSL,
                     'stream': imaplib.IMAP4_stream }
         scheme, netloc, path, _, _, _ = urlparse.urlparse(config['connection'])
         _debug(lambda : 'scheme: %s netloc: %s path: %s' % (scheme, netloc, path))
@@ -323,7 +323,7 @@ def msgset_from(arglist):
     msgset = msgset.replace(' ', ',')
     msgset = msgset.replace('last', "*")
     msgset = msgset.replace('$', "*")
-    return msgset 
+    return msgset
 
 
 def _checkMsgset(msgset):
@@ -404,7 +404,7 @@ def _get_Messages(folder, msgset):
     return messages
 
 def _get_curMessage():
-    folder = state['folder'] 
+    folder = state['folder']
     try:
         msgset = state[folder+'.cur']
     except KeyError:
@@ -419,7 +419,7 @@ def _quoted_current(data, msg):
         _debug(lambda: "PART %s:" % part.get_content_type())
         for line in part.get_payload(decode=True).split("\n"):
             result += "> " + line + "\n"
-    return result 
+    return result
 
 def __header(data, msg, header):
     if header in msg:
@@ -440,7 +440,7 @@ def _header_from_name(data, msg):
     else:
         return full
 
-macros = { 
+macros = {
     '###QUOTED###': _quoted_current,
     '###:FROM###':_header_from,
     '###:DATE###':_header_date,
@@ -469,16 +469,16 @@ def _template_update(msgfile):
 
 def comp(args):
     '''Usage: comp
-    
+
     Compose a new message
     '''
     tmpfile = tempFileName(prefix="mhi-comp-")
     if config.get('comp_template', None):
        import shutil
-       shutil.copyfile(config['comp_template'], tmpfile) 
+       shutil.copyfile(config['comp_template'], tmpfile)
     ret = _edit(tmpfile)
     if ret == 0:
-        # edit succeeded, wasn't aborted or anything 
+        # edit succeeded, wasn't aborted or anything
         errcount = _SMTPsend(tmpfile)
         if not errcount:
             os.unlink(tmpfile)
@@ -493,7 +493,7 @@ def comp(args):
 
 def repl(args):
     '''Usage: repl
-    
+
     Reply to the current message, quoting it
     '''
     tmpfile = tempFileName(prefix="mhi-repl-")
@@ -506,7 +506,7 @@ def repl(args):
     # TODO: swipe MH's -cc, etc syntax for specifying who to copy
     ret = _edit(tmpfile)
     if ret == 0:
-        # edit succeeded, wasn't aborted or anything 
+        # edit succeeded, wasn't aborted or anything
         errcount = _SMTPsend(tmpfile)
         if not errcount:
             os.unlink(tmpfile)
@@ -552,7 +552,7 @@ def folder(folder, arglist):
 
 def folders(args):
     '''Usage: folders
-    
+
     Show all folders
     '''
     enable_pager()
@@ -594,8 +594,8 @@ def _consolidate(data):
     str_list = []
     for k, g in groupby(enumerate(data), lambda (i,x):i-x):
         ilist = map(itemgetter(1), g)
-	_debug(lambda: "_consolidating: " + repr(ilist))
-	if len(ilist) > 1:
+        _debug(lambda: "_consolidating: " + repr(ilist))
+        if len(ilist) > 1:
             str_list.append('%d-%d' % (ilist[0], ilist[-1]))
         else:
             str_list.append('%d' % ilist[0])
@@ -694,7 +694,7 @@ def rmm(folder, arglist):
     ie: rmm +INBOX 1
     ie: rmm 1:5
 
-    Remove the specified messages (or the current message if unspecified)  
+    Remove the specified messages (or the current message if unspecified)
     from the specified folder (or the current folder if unspecified).
     '''
     folder = state['folder'] = folder or state['folder']
@@ -768,7 +768,7 @@ def show(folder, arglist):
     _checkMsgset(msgset)
     shown = _show(folder, msgset)
     if shown:
-        state[folder+'.cur'] = shown 
+        state[folder+'.cur'] = shown
 
 # TODO: needs better bounds checking
 @takesFolderArg
@@ -784,7 +784,7 @@ def next(folder, arglist):
         cur = 1
     shown = _show(folder, str(cur))
     if shown:
-        state[folder+'.cur'] = shown 
+        state[folder+'.cur'] = shown
 
 # TODO: needs better bounds checking
 @takesFolderArg
@@ -799,7 +799,7 @@ def prev(folder, arglist):
         cur = 1
     shown = _show(folder, str(cur))
     if shown:
-        state[folder+'.cur'] = shown 
+        state[folder+'.cur'] = shown
 
 @takesFolderArg
 def scan(folder, arglist):
@@ -878,7 +878,7 @@ def scan(folder, arglist):
 def debug(args):
     global _debug
     _debug = _debug_stdout
-    _dispatch([sys.argv[0]]+args) 
+    _dispatch([sys.argv[0]]+args)
 
 def help(args):
     '''Usage: help <command>
@@ -945,7 +945,7 @@ def _dispatch(args):
                 sys.exit(1)
             config.write()
             state.write()
-        else:        
+        else:
             print("Unknown command %s.  Valid ones: %s " % (sys.argv[1], ', '.join(_sort(Commands.keys()))))
     else:
         print("Must specify a command.  Valid ones: %s " % ', '.join(_sort(Commands.keys())))

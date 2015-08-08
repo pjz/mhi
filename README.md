@@ -4,6 +4,8 @@ MHI
 mhi is a commandline style mailreader in the tradition of mh and nmh,
 but mutated to support IMAP.
 
+[![Build Status](https://travis-ci.org/pjz/mhi.svg?branch=master)](https://travis-ci.org/pjz/mhi)
+
 Why?
 
 One thing that IMAP provides is the ability for multiple clients to
