@@ -946,7 +946,7 @@ def _dispatch(args):
             config.write()
             state.write()
         else:
-            print("Unknown command %s.  Valid ones: %s " % (sys.argv[1], ', '.join(_sort(Commands.keys()))))
+            print("Unknown command %s.  Valid ones: %s " % (cmd, ', '.join(_sort(Commands.keys()))))
     else:
         print("Must specify a command.  Valid ones: %s " % ', '.join(_sort(Commands.keys())))
 
