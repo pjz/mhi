@@ -31,7 +31,7 @@ setup( author = 'Paul Jimenez'
      , packages = find_packages()
      , entry_points = { 'console_scripts': [ 'mhi = mhi:main' ]}
      # there must be nothing on the following line after the = other than a string constant
-     , version = '0.6.2'
+     , version = '0.6.3'
      , install_requires = [ 'configobj' ]
      , zip_safe = False
       )
