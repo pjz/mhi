@@ -954,7 +954,8 @@ def _dispatch(args):
 def cmd_main():
     # dispatch on program name instead of args[1]
     try:
-        args = [ 'mhi' ] + sys.argv
+        cmd = os.path.basename(sys.argv[0])
+        args = [ 'mhi', cmd ] + sys.argv[1:]
         _dispatch(args)
     except KeyboardInterrupt:
         print("Interrupted.")
