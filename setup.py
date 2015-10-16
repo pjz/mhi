@@ -5,7 +5,7 @@ except ImportError:
         from ez_setup import use_setuptools
         use_setuptools()
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 classifiers = [ 'Development Status :: 5 - Production/Stable'
               , 'Environment :: Console'
@@ -28,10 +28,11 @@ setup( author = 'Paul Jimenez'
      , description = 'MH for IMAP'
      , name = 'mhi'
      , url = 'http://github.com/pjz/mhi'
-     , py_modules = [ 'distribute_setup', 'mhi' ]
+     , packages = find_packages()
      , entry_points = { 'console_scripts': [ 'mhi = mhi:main' ]}
      # there must be nothing on the following line after the = other than a string constant
-     , version = '0.6.1'
+     , version = '0.6.2'
+     , install_requires = [ 'configobj' ]
      , zip_safe = False
       )
 

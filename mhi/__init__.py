@@ -47,12 +47,12 @@ def _debug_stdout(arg):
 _debug = _debug_noop
 
 def sexpr_readsexpr(s):
-    import sexpr
-    return sexpr.SexprParser(StringIO.StringIO(s)).parse()
+    from .sexpr import SexprParser
+    return SexprParser(StringIO.StringIO(s)).parse()
 
 def readlisp_readsexpr(s):
-    import readlisp
-    return readlisp.readlisp(s)
+    from .readlisp import readlisp
+    return readlisp(s)
 
 readsexpr = readlisp_readsexpr
 
