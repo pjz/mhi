@@ -28,7 +28,7 @@ clean-testf:
 	rm -rf tests/.pytest
 
 clean: clean-testf
-	rm -rf env build dist
+	rm -rf env build dist *.egg-info
 	find . -name __pycache__ | xargs rm -rf
 	find . -name \*.pyc | xargs rm -f
 

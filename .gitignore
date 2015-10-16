@@ -6,3 +6,4 @@ __pycache__
 /env
 /tests/.pytest
 .ropeproject/
+.cache/
