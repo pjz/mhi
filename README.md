@@ -17,6 +17,12 @@ Python's imaplib made this easy.
 Version history:
 ----------------
 
+0.6.5 Make it a python package available from PyPI, etc.
+      Incorporate the wrapper script and mkLinks functionality; try:
+
+      python -m mhi.mklinks <destdir>
+
+
 0.5 Inital release because I'm losing inspiration and should share what
     I've managed so far.
 

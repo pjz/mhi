@@ -951,15 +951,18 @@ def _dispatch(args):
         print("Must specify a command.  Valid ones: %s " % ', '.join(_sort(Commands.keys())))
 
 
+def cmd_main():
+    # dispatch on program name instead of args[1]
+    try:
+        args = [ 'mhi' ] + sys.argv
+        _dispatch(args)
+    except KeyboardInterrupt:
+        print("Interrupted.")
 
-# main program
 def main():
+    # main program
     try:
         _dispatch(sys.argv)
     except KeyboardInterrupt:
         print("Interrupted.")
-
-
-if __name__ == '__main__':
-    main()
 

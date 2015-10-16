@@ -29,9 +29,11 @@ setup( author = 'Paul Jimenez'
      , name = 'mhi'
      , url = 'http://github.com/pjz/mhi'
      , packages = find_packages()
-     , entry_points = { 'console_scripts': [ 'mhi = mhi:main' ]}
+     , entry_points = { 'console_scripts': [ 'mhi = mhi:main'
+                                            ,'mhiWrap = mhi:cmd_main'
+                                            ]}
      # there must be nothing on the following line after the = other than a string constant
-     , version = '0.6.3'
+     , version = '0.6.5'
      , install_requires = [ 'configobj' ]
      , zip_safe = False
       )
