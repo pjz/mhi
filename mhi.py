@@ -953,10 +953,13 @@ def _dispatch(args):
 
 
 # main program
-
-if __name__ == '__main__':
+def main():
     try:
         _dispatch(sys.argv)
     except KeyboardInterrupt:
         print("Interrupted.")
+
+
+if __name__ == '__main__':
+    main()
 

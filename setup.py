@@ -31,7 +31,7 @@ setup( author = 'Paul Jimenez'
      , py_modules = [ 'distribute_setup', 'mhi' ]
      , entry_points = { 'console_scripts': [ 'mhi = mhi:main' ]}
      # there must be nothing on the following line after the = other than a string constant
-     , version = '0.6'
+     , version = '0.6.1'
      , zip_safe = False
       )
 
