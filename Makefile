@@ -41,6 +41,10 @@ release:
 		echo "Update the version number and try again.";\
 		exit 1;\
 	fi
+	@if [ `git status --short | wc -l` != 0 ]; then\
+		echo "Uncommited code. Aborting." ;\
+		exit 1;\
+	fi
 	$(PYTHON) setup.py bdist_wheel upload
 	$(PYTHON) setup.py sdist --formats=zip,gztar,bztar upload
 	git tag $(PROJ)-`$(PYTHON) setup.py -V`

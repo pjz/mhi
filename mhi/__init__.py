@@ -702,12 +702,14 @@ def rmm(folder, arglist):
     _checkMsgset(msgset)
     with Connection(folder) as S:
         data = S.search(None, msgset, errmsg = "Problem with search:")
+        _debug(lambda: "data: %s" % repr(data))
         S.store(msgset, '+FLAGS', '\\Deleted', errmsg = "Problem setting deleted flag: ")
         S.expunge(errmsg = "Problem expunging deleted messages: ")
         print("Deleted.")
-    first = data[0].split()[0]
-    # TODO: fix this
-    state[folder+'.cur'] = first
+    if data and data[0]:
+        first = data[0].split()[0]
+        # TODO: fix this
+        state[folder+'.cur'] = first
 
 @takesFolderArg
 def mr(folder, arglist):
