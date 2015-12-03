@@ -644,7 +644,6 @@ def refile(destfolder, arglist):
 
     Moves a set of messages from the current folder to a new one.
     '''
-    if not arglist: raise UsageError()
     if destfolder is None:
         print("Error: Destination folder must be specified.")
         raise UsageError()
