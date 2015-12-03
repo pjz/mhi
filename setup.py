@@ -33,7 +33,7 @@ setup( author = 'Paul Jimenez'
                                             ,'mhiWrap = mhi:cmd_main'
                                             ]}
      # there must be nothing on the following line after the = other than a string constant
-     , version = '0.6.6'
+     , version = '0.6.7'
      , install_requires = [ 'configobj' ]
      , zip_safe = False
       )
