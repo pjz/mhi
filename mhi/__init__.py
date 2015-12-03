@@ -30,13 +30,16 @@ import imaplib
 import StringIO
 from configobj import ConfigObj
 
+
 cfgdir = os.environ.get('HOME','')
 config = ConfigObj(infile="%s/.mhirc" % cfgdir, create_empty=True)
 state = ConfigObj(infile="%s/.mhistate" % cfgdir, create_empty=True)
 Debug = 0
 
+
 def _debug_noop(*args):
     pass
+
 
 def _debug_stdout(arg):
     f = arg
@@ -44,17 +47,22 @@ def _debug_stdout(arg):
         f = lambda : arg
     print("DEBUG: ", f())
 
+
 _debug = _debug_noop
+
 
 def sexpr_readsexpr(s):
     from .sexpr import SexprParser
     return SexprParser(StringIO.StringIO(s)).parse()
 
+
 def readlisp_readsexpr(s):
     from .readlisp import readlisp
     return readlisp(s)
 
+
 readsexpr = readlisp_readsexpr
+
 
 PickDocs = """ From RFC2060:
       When multiple keys are specified, the result is the intersection
@@ -183,8 +191,10 @@ PickDocs = """ From RFC2060:
 
 """
 
+
 class UsageError:
     pass
+
 
 def _argFolder(args, default=None):
     '''
@@ -210,12 +220,14 @@ def _argFolder(args, default=None):
 
     return folder, outargs
 
+
 def takesFolderArg(f):
     def parseFolderArg(args):
         folder, outargs = _argFolder(args)
         return f(folder, outargs)
     parseFolderArg.__doc__ = f.__doc__
     return parseFolderArg
+
 
 class Connection:
     def __init__(self, startfolder=None):
@@ -248,16 +260,16 @@ class Connection:
             session = schemes[scheme](path)
         session.debug = 0 if _debug == _debug_noop else 4
         self.session = session
-	if startfolder is None:
-	    startfolder = state['folder']
-	die_on_error(session.select)(startfolder, errmsg = "Problem changing to folder %s:" % folder)
+        if startfolder is None:
+            startfolder = state['folder']
+        die_on_error(session.select)(startfolder, errmsg = "Problem changing to folder %s:" % folder)
         state['folder'] = startfolder
 
     def __enter__(self):
         return self
 
     def __exit__(self, *args):
-	_debug('Exit args are: ' + repr(args))
+        _debug('Exit args are: ' + repr(args))
         self.session.close()
         self.session.logout()
 
@@ -275,7 +287,7 @@ class Connection:
 def die_on_error(f):
     def _die_on_err_wrapper(*args, **kwargs):
         msgstr = kwargs.get('errmsg', 'There was a problem:')
-	if 'errmsg' in kwargs:
+        if 'errmsg' in kwargs:
             del kwargs['errmsg']
         result, data = f(*args, **kwargs)
         if result != 'OK':
@@ -283,6 +295,7 @@ def die_on_error(f):
             sys.exit(1)
         return data
     return _die_on_err_wrapper
+
 
 def enable_pager():
     if sys.stdout.isatty():
@@ -294,6 +307,7 @@ def enable_pager():
                    break
        if pager is not None:
            sys.stdout = os.popen(pager, 'w')
+
 
 def msgset_from(arglist):
     ''' turn a list of numbers into a valid msgset:
@@ -335,12 +349,14 @@ def _checkMsgset(msgset):
         print("%s isn't a valid messageset. Try again." % msgset)
         sys.exit(1)
 
+
 def tempFileName(*args,**kwargs):
     import tempfile
     f = tempfile.NamedTemporaryFile(*args,**kwargs)
     name = f.name
     f.close()
     return name
+
 
 def _crlf_terminate(msgfile):
     ''' convenience function to turn a \n terminated file into a \r\n terminated file '''
@@ -356,6 +372,7 @@ def _crlf_terminate(msgfile):
     inf.close()
     outf.close()
 
+
 def _edit(msgfile):
     ''' internal common code for comp/repl/dist/medit '''
     env = os.environ
@@ -364,9 +381,12 @@ def _edit(msgfile):
         fin = os.system("%s %s" % (editor, msgfile))
         if os.path.exists(msgfile):
             _crlf_terminate(msgfile)
-    except Exception:
-        return 1
-    return fin
+    except Exception as e:
+        _debug(lambda: "editor exception: %r " % e)
+        return False
+    _debug(lambda: "editor result code: %d" % fin)
+    return fin == 0
+
 
 def _SMTPsend(msgfile):
     import smtplib
@@ -393,15 +413,17 @@ def _SMTPsend(msgfile):
         print("SMTP Error: %s: %s" % (k, ret[k]))
     return len(ret.keys())
 
-def _get_Messages(folder, msgset):
+
+def _get_messages(folder, msgset):
     with Connection(folder) as S:
         msglist = S.search(None, msgset, errmsg = "Problem with search:")
         messages = []
         for num in msglist[0].split():
             result, data = S.fetch(num, '(RFC822)', errmsg="Problem fetching msg %s: " % num)
-	    _debug(lambda: "Data from message %r : %r" % (num, data))
+            _debug(lambda: "Data from message %r : %r" % (num, data))
             messages.append((num, data))
     return messages
+
 
 def _get_curMessage():
     folder = state['folder']
@@ -411,44 +433,49 @@ def _get_curMessage():
         print("Error: No current message selected.")
         raise UsageError()
     _checkMsgset(msgset)
-    return _get_Messages(folder, msgset)[0][1]
+    return _get_messages(folder, msgset)[0][1]
 
-def _quoted_current(data, msg):
-    result = ""
-    for part in msg.walk():
-        _debug(lambda: "PART %s:" % part.get_content_type())
-        for line in part.get_payload(decode=True).split("\n"):
-            result += "> " + line + "\n"
-    return result
-
-def __header(data, msg, header):
-    if header in msg:
-        return msg[header]
-    else:
-        return "[[Missing %s header]]" % header
-
-def _header_from(data, msg): return __header(data, msg, 'from')
-def _header_date(data, msg): return __header(data, msg, 'date')
-def _header_subject(data, msg): return __header(data, msg, 'subject')
-
-def _header_from_name(data, msg):
-    full = _header_from(data, msg)
-    left = full.find("<")
-    right = full.find(">")
-    if left > -1 and right > -1:
-        return full[:left] + full[right+1:]
-    else:
-        return full
-
-macros = {
-    '###QUOTED###': _quoted_current,
-    '###:FROM###':_header_from,
-    '###:DATE###':_header_date,
-    '###:SUBJECT###':_header_subject,
-    '###:FROM.NAME###':_header_from_name,
-}
 
 def _template_update(msgfile):
+
+    def _quoted_current(data, msg):
+        result = ""
+        for part in msg.walk():
+            _debug(lambda: "PART %s:" % part.get_content_type())
+            for line in part.get_payload(decode=True).split("\n"):
+                result += "> " + line + "\n"
+        return result
+
+
+    def __header(data, msg, header):
+        if header in msg:
+            return msg[header]
+        else:
+            return "[[Missing %s header]]" % header
+
+
+    def _header_from(data, msg): return __header(data, msg, 'from')
+    def _header_date(data, msg): return __header(data, msg, 'date')
+    def _header_subject(data, msg): return __header(data, msg, 'subject')
+
+
+    def _header_from_name(data, msg):
+        full = _header_from(data, msg)
+        left = full.find("<")
+        right = full.find(">")
+        if left > -1 and right > -1:
+            return full[:left] + full[right+1:]
+        else:
+            return full
+
+    macros = {
+        '###QUOTED###': _quoted_current,
+        '###:FROM###':_header_from,
+        '###:DATE###':_header_date,
+        '###:SUBJECT###':_header_subject,
+        '###:FROM.NAME###':_header_from_name,
+    }
+
     import email
     template = open(msgfile, 'r')
     templatetext = template.readlines()
@@ -456,13 +483,13 @@ def _template_update(msgfile):
     curdata = _get_curMessage()
     curmsg = email.message_from_string(curdata[0][1])
     for line in templatetext:
-        replacements = 1
-    	while replacements:
-            replacements = 0
+        changed = True
+        while changed:
+            changed = False
             for macro, impl in macros.items():
                 if macro in line:
-	            line = line.replace(macro, impl(curdata, curmsg))
-                    replacements += 1
+                    line = line.replace(macro, impl(curdata, curmsg))
+                    changed = True
         outfile.write(line)
     outfile.close()
 
@@ -476,8 +503,7 @@ def comp(args):
     if config.get('comp_template', None):
        import shutil
        shutil.copyfile(config['comp_template'], tmpfile)
-    ret = _edit(tmpfile)
-    if ret == 0:
+    if _edit(tmpfile):
         # edit succeeded, wasn't aborted or anything
         errcount = _SMTPsend(tmpfile)
         if not errcount:
@@ -504,8 +530,7 @@ def repl(args):
     # TODO: put quoted contents of current message into tmpfile
     # TODO: put the author of the current message in the 'To:' field
     # TODO: swipe MH's -cc, etc syntax for specifying who to copy
-    ret = _edit(tmpfile)
-    if ret == 0:
+    if _edit(tmpfile):
         # edit succeeded, wasn't aborted or anything
         errcount = _SMTPsend(tmpfile)
         if not errcount:
@@ -514,6 +539,7 @@ def repl(args):
         # 'abort - throw away session, keep - save it for later'
         print("Session aborted.")
         os.unlink(tmpfile)
+
 
 def _selectOrCreate(S, folder):
     result, data = S.raw_select(folder)
@@ -529,11 +555,13 @@ def _selectOrCreate(S, folder):
             sys.exit(1)
     return data
 
+
 def folder_name(folder):
     prefix = config.get('folder_prefix',None)
     if prefix and folder.startswith(prefix):
         return folder[len(prefix):]
     return folder
+
 
 @takesFolderArg
 def folder(folder, arglist):
@@ -573,7 +601,7 @@ def folders(args):
     totalmsgs, totalnew = 0, 0
     for folder in [HEADER]+folderlist:
         _debug(lambda: " folder: %s " % repr(folder))
-        iscur = [' ', '*'][ folder == state['folder'] ]
+        iscur = '*' if folder == state['folder'] else ' '
         foo = stats[folder]
         _debug(lambda: "  Stats: %s " % repr(foo))
         messages, recent, unseen = foo[1], foo[3], foo[5]
@@ -615,8 +643,7 @@ def pick(folder, arglist):
     if len(arglist) == 1 and arglist[0] == "--help":
         print(PickDocs)
         sys.exit(1)
-    if folder is not None: state['folder'] = folder
-    else: folder = state['folder']
+    folder = state['folder'] = folder or state['folder']
     searchstr = '('+' '.join(arglist)+')'
     with Connection(folder) as S:
         data = S.search(None, searchstr, errmsg = "Problem with search criteria:")
@@ -664,6 +691,7 @@ def refile(destfolder, arglist):
         print("%d messages refiled to '%s'." % (len(msgnums), destfolder))
     print("Done.")
 
+
 @takesFolderArg
 def rmf(folder, arglist):
     '''Usage:  rmf +<foldername>
@@ -685,6 +713,7 @@ def rmf(folder, arglist):
         print("Folder '%s' deleted." % folder)
     else:
         print("Failed to delete folder '%s': %s" % (folder, data))
+
 
 @takesFolderArg
 def rmm(folder, arglist):
@@ -709,6 +738,7 @@ def rmm(folder, arglist):
         first = data[0].split()[0]
         # TODO: fix this
         state[folder+'.cur'] = first
+
 
 @takesFolderArg
 def mr(folder, arglist):
@@ -738,6 +768,7 @@ def _headers_from(msg):
             return result
     return result
 
+
 def _show(folder, msgset):
     '''common code for show/next/prev'''
     import email
@@ -745,7 +776,7 @@ def _show(folder, msgset):
     outputfunc = print
     with Connection(folder) as S:
         msglist = S.search(None, msgset, errmsg = "Problem with search:")
-	_debug(lambda: "SEARCH returned: %r" % msglist)
+        _debug(lambda: "SEARCH returned: %r" % msglist)
         last = None
         for num in msglist[0].split():
             result, data = S.raw_fetch(num, '(RFC822)')
@@ -757,6 +788,7 @@ def _show(folder, msgset):
                 outputfunc(part.get_payload(decode=True))
             last = num
     return last
+
 
 @takesFolderArg
 def show(folder, arglist):
@@ -771,13 +803,14 @@ def show(folder, arglist):
     if shown:
         state[folder+'.cur'] = shown
 
-# TODO: needs better bounds checking
+
 @takesFolderArg
 def next(folder, arglist):
     '''Usage: next [+<folder>]
 
     Show the next message in the specified folder, or the current folder if not specified
     '''
+    # TODO: needs better bounds checking
     folder = state['folder'] = folder or state['folder']
     try:
         cur = int(state[folder+'.cur']) + 1
@@ -787,12 +820,13 @@ def next(folder, arglist):
     if shown:
         state[folder+'.cur'] = shown
 
-# TODO: needs better bounds checking
+
 @takesFolderArg
 def prev(folder, arglist):
     '''Usage: prev [+<folder>]
     Show the previous message in the specified folder, or the current folder if not specified
     '''
+    # TODO: needs better bounds checking
     folder = state['folder'] = folder or state['folder']
     try:
         cur = int(state[folder+'.cur']) - 1
@@ -801,6 +835,7 @@ def prev(folder, arglist):
     shown = _show(folder, str(cur))
     if shown:
         state[folder+'.cur'] = shown
+
 
 @takesFolderArg
 def scan(folder, arglist):
@@ -881,6 +916,7 @@ def debug(args):
     _debug = _debug_stdout
     _dispatch([sys.argv[0]]+args)
 
+
 def help(args):
     '''Usage: help <command>
     Shows help on the specified command.
@@ -960,6 +996,7 @@ def cmd_main():
         _dispatch(args)
     except KeyboardInterrupt:
         print("Interrupted.")
+
 
 def main():
     # main program
