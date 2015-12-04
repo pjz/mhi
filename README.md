@@ -1,5 +1,5 @@
 MHI
----
+===
 
 mhi is a commandline style mailreader in the tradition of mh and nmh,
 but mutated to support IMAP.
@@ -7,30 +7,29 @@ but mutated to support IMAP.
 [![Build Status](https://travis-ci.org/pjz/mhi.svg?branch=master)](https://travis-ci.org/pjz/mhi)
 
 Why?
+----
 
 One thing that IMAP provides is the ability for multiple clients to
 access the same mail store. Graphical clients are all well and good,
 but sometimes a reversion to the commandline is necessary. Neither mh
-nor nmh will talk to an IMAP server, so I had to write my own client.
-Python's imaplib made this easy.
+nor nmh will talk to an IMAP server (mh's original semantics, which
+nmh duplicates, rely on messages not auto-renumbering, as they do in
+IMAP folders), so I had to write my own client.  Python's imaplib made this easy.
 
-Version history:
-----------------
+How?
+----
 
-0.6.5 Make it a python package available from PyPI, etc.
-      Incorporate the wrapper script and mkLinks functionality; try:
+As of v0.6.5 MHI is available as a PyPI package (`pip install mhi`)
+The same version also incorporates the old mkLinks wrapper-script functionality
+via:
 
       python -m mhi.mklinks <destdir>
-
-
-0.5 Inital release because I'm losing inspiration and should share what
-    I've managed so far.
 
 TODO:
 -----
 
- * use getopt
- * more help - should be self-documenting ala svn/cvs
+ * use click
+ * more help - should be self-documenting
 
 Licensing information is in the LICENSE file. (short version: GPLv3 or CCBYSA)
 
