@@ -26,20 +26,38 @@ import email
 import shutil
 import string
 import imaplib
-import smtplib
-import subprocess
-from functools import wraps
-from io import StringIO
-from pathlib import Path
-from urllib import parse as urlparse
+import StringIO
 
-from configobj import ConfigObj
+from everett.manager import ConfigManager, ConfigOSEnv, ConfigIniEnv
 
-cfgdir = os.environ.get('HOME', '')
-config = ConfigObj(infile=f"{cfgdir}/.mhirc", create_empty=True)
-state = ConfigObj(infile=f"{cfgdir}/.mhistate", create_empty=True)
-Debug = 0
+config = ConfigManager([
+        # Looks in OS environment first
+        ConfigOSEnv(),
 
+        # Looks in INI files in order specified
+        ConfigIniEnv([
+            os.environ.get('MHIRC'),
+            '~/.mhirc',
+            '/etc/mhirc'
+        ]),
+    ],
+    # Make it easy for users to find your configuration docs
+    doc='Used to configure MHI'
+)
+
+state = ConfigManager([
+        # Looks in OS environment first
+        ConfigOSEnv(),
+
+        # Looks in INI files in order specified
+        ConfigIniEnv([
+            os.environ.get('MHISTATE'),
+            '~/.mhistate',
+        ]),
+    ],
+    # Make it easy for users to find your configuration docs
+    doc='used internally to hold state'
+)
 
 def _debug_noop(*args):
     pass
