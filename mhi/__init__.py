@@ -270,8 +270,11 @@ class Connection:
 
     def __exit__(self, *args):
         _debug('Exit args are: ' + repr(args))
-        self.session.close()
-        self.session.logout()
+        try:
+            self.session.close()
+            self.session.logout()
+        except imaplib.IMAP4.error:
+            pass
 
     def __getattr__(self, name):
         raw = False
