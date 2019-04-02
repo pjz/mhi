@@ -25,6 +25,23 @@ via:
 
       python -m mhi.mklinks <destdir>
 
+It then needs to be configured.  Make a ~/.mhirc file with the line:
+
+connection = imap[s]://[username]:[password]@[host][:port]//
+
+  This configures the IMAP(s) connection to use
+
+Other variables are supported but optional, like 
+
+  `folder_prefix` - the prefix to add to your IMAP folders
+
+  `comp_template` - the template put into your editor when you use `comp` to
+                    write new mail
+
+  `repl_template` - the template put into your editor when you `repl`y to a message
+
+
+
 TODO:
 -----
 
