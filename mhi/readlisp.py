@@ -3,8 +3,8 @@ Ole Martin Bjorndalen <olemb@stud.cs.uit.no>
 2006-08-12
 """
 
-import StringIO
 import types
+from io import StringIO
 
 EOF = ''
 END_PAREN = ')'
@@ -84,7 +84,7 @@ class LispReader:
 
     def _read_string(self):
         string = ''
-        
+
         while 1:
             c = self.file.getchar()
 
@@ -101,7 +101,7 @@ class LispReader:
             else:
                 string += c
 
-    def _read_list(self):        
+    def _read_list(self):
         items = []
         while 1:
             item = self._read_expr()
@@ -146,7 +146,7 @@ def writelisp(obj):
     """Convert a python object into an equivalent lisp expression."""
 
     if type(obj) is types.ListType:
-	return '(%s)' % ' '.join(map(writelisp, obj))
+        return '(%s)' % ' '.join(map(writelisp, obj))
     elif type(obj) is types.StringType:
         out = '"'
         for c in obj:
@@ -158,17 +158,17 @@ def writelisp(obj):
     elif type(obj) in [types.LongType, types.IntType]:
         return str(obj)
     elif type(obj) is types.ComplexType:
-	return '#C(%s %s)' % (obj.real, obj.imag)
+        return '#C(%s %s)' % (obj.real, obj.imag)
     elif obj == None:
-	return 'nil'
+        return 'nil'
     else:
-	return repr(obj)
+        return repr(obj)
 
 def readlisp(text):
     """Read the first lisp expression in the string"""
-    return LispReader(StringIO.StringIO(text))._read_expr()
+    return LispReader(StringIO(text))._read_expr()
 
 if __name__ == '__main__':
     p = LispReader(open('test.lisp'))
-    print repr(p._read_expr())
+    print(repr(p._read_expr()))
 

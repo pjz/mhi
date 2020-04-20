@@ -27,8 +27,9 @@ import time
 import string
 import os.path
 import imaplib
-import StringIO
+from io import StringIO
 from configobj import ConfigObj
+
 
 
 cfgdir = os.environ.get('HOME','')
@@ -48,7 +49,8 @@ def _debug_stdout(arg):
     print("DEBUG: ", f())
 
 
-_debug = _debug_noop
+_debug = _debug_stdout
+#_debug = _debug_noop
 
 
 def sexpr_readsexpr(s):
@@ -58,7 +60,7 @@ def sexpr_readsexpr(s):
 
 def readlisp_readsexpr(s):
     from .readlisp import readlisp
-    return readlisp(s)
+    return readlisp(s.decode() if type(s) != str else s)
 
 
 readsexpr = readlisp_readsexpr
@@ -88,7 +90,7 @@ PickDocs = """ From RFC2060:
       ALL            All messages in the mailbox; the default initial
                      key for ANDing.
 
-      ANSWERED       Messages with the \Answered flag set.
+      ANSWERED       Messages with the \\Answered flag set.
 
       BCC <string>   Messages that contain the specified string in the
                      envelope structure's BCC field.
@@ -102,11 +104,11 @@ PickDocs = """ From RFC2060:
       CC <string>    Messages that contain the specified string in the
                      envelope structure's CC field.
 
-      DELETED        Messages with the \Deleted flag set.
+      DELETED        Messages with the \\Deleted flag set.
 
-      DRAFT          Messages with the \Draft flag set.
+      DRAFT          Messages with the \\Draft flag set.
 
-      FLAGGED        Messages with the \Flagged flag set.
+      FLAGGED        Messages with the \\Flagged flag set.
 
       FROM <string>  Messages that contain the specified string in the
                      envelope structure's FROM field.
@@ -122,15 +124,15 @@ PickDocs = """ From RFC2060:
       LARGER <n>     Messages with an [RFC-822] size larger than the
                      specified number of octets.
 
-      NEW            Messages that have the \Recent flag set but not the
-                     \Seen flag.  This is functionally equivalent to
+      NEW            Messages that have the \\Recent flag set but not the
+                     \\Seen flag.  This is functionally equivalent to
                      "(RECENT UNSEEN)".
 
       NOT <search-key>
                      Messages that do not match the specified search
                      key.
 
-      OLD            Messages that do not have the \Recent flag set.
+      OLD            Messages that do not have the \\Recent flag set.
                      This is functionally equivalent to "NOT RECENT" (as
                      opposed to "NOT NEW").
 
@@ -140,9 +142,9 @@ PickDocs = """ From RFC2060:
       OR <search-key1> <search-key2>
                      Messages that match either search key.
 
-      RECENT         Messages that have the \Recent flag set.
+      RECENT         Messages that have the \\Recent flag set.
 
-      SEEN           Messages that have the \Seen flag set.
+      SEEN           Messages that have the \\Seen flag set.
 
       SENTBEFORE <date>
                      Messages whose [RFC-822] Date: header is earlier
@@ -175,24 +177,23 @@ PickDocs = """ From RFC2060:
                      Messages with unique identifiers corresponding to
                      the specified unique identifier set.
 
-      UNANSWERED     Messages that do not have the \Answered flag set.
+      UNANSWERED     Messages that do not have the \\Answered flag set.
 
-      UNDELETED      Messages that do not have the \Deleted flag set.
+      UNDELETED      Messages that do not have the \\Deleted flag set.
 
-      UNDRAFT        Messages that do not have the \Draft flag set.
+      UNDRAFT        Messages that do not have the \\Draft flag set.
 
-      UNFLAGGED      Messages that do not have the \Flagged flag set.
+      UNFLAGGED      Messages that do not have the \\Flagged flag set.
 
       UNKEYWORD <flag>
                      Messages that do not have the specified keyword
                      set.
 
-      UNSEEN         Messages that do not have the \Seen flag set.
+      UNSEEN         Messages that do not have the \\Seen flag set.
 
 """
 
-
-class UsageError:
+class UsageError(Exception):
     pass
 
 
@@ -231,7 +232,8 @@ def takesFolderArg(f):
 
 class Connection:
     def __init__(self, startfolder=None):
-        import urlparse
+        from urllib import parse as urlparse
+
         schemes = { 'imap' : imaplib.IMAP4,
                     'imaps': imaplib.IMAP4_SSL,
                     'stream': imaplib.IMAP4_stream }
@@ -294,7 +296,7 @@ def die_on_error(f):
             del kwargs['errmsg']
         result, data = f(*args, **kwargs)
         if result != 'OK':
-            print(msgstr + ' ' + str(data))
+            print(msgstr + ' ' + result + ": " + str(data))
             sys.exit(1)
         return data
     return _die_on_err_wrapper
@@ -365,8 +367,8 @@ def _crlf_terminate(msgfile):
     ''' convenience function to turn a \n terminated file into a \r\n terminated file '''
     tfile = tempFileName(prefix="mhi")
     os.rename(msgfile,tfile)
-    inf = file(tfile,"r")
-    outf = file(msgfile,"w")
+    inf = open(tfile,"r")
+    outf = open(msgfile,"w")
     for line in inf:
         if not line.endswith('\r\n'):
            line = line[:-1] # strip existing \n (or \r?)
@@ -395,7 +397,7 @@ def _SMTPsend(msgfile):
     import smtplib
     import email
     ret = {'Unknown':'SMTP problem'}
-    msg = email.message_from_file(file(msgfile,"r"))
+    msg = email.message_from_file(open(msgfile,"r"))
     fromaddr = msg.get('From','')
     toaddrs = msg.get_all('To',[])
     _debug(lambda: "composing message from %s to %s" % (repr(fromaddr), repr(toaddrs)))
@@ -545,6 +547,7 @@ def repl(args):
 
 
 def _selectOrCreate(S, folder):
+    msgcount = '0'
     result, data = S.raw_select(folder)
     _debug(lambda: " Result: %s, %s " % (result, data))
     if result != 'OK':
@@ -556,7 +559,9 @@ def _selectOrCreate(S, folder):
         else:
             print("Nothing done. exiting.")
             sys.exit(1)
-    return data
+    else:
+        msgcount = data[0]
+    return msgcount
 
 
 def folder_name(folder):
@@ -575,11 +580,11 @@ def folder(folder, arglist):
     if arglist: raise UsageError()
     if folder is None: folder = state['folder']
     with Connection() as S:
-        data = _selectOrCreate(S, folder)
+        msgcount = _selectOrCreate(S, folder)
     state['folder'] = folder
     # inbox+ has 64 messages  (1-64); cur=63; (others).
     cur = state.get(folder+'.cur', 'unset')
-    print("Folder %s has %s messages, cur is %s." % (folder_name(folder), data[0], cur))
+    print("Folder %s has %s messages, cur is %s." % (folder_name(folder), msgcount, cur))
 
 def folders(args):
     '''Usage: folders
@@ -593,7 +598,8 @@ def folders(args):
         _debug(lambda: " flist: %s " % repr(flist))
         stats = {}
         for fline in flist:
-            f = str(readsexpr('('+fline+')')[2])
+            fstr = fline.decode() if type(fline) != str else fline
+            f = str(readsexpr('('+fstr+')')[2])
             _debug(lambda: " f: %s " % repr(f))
             result, data = S.raw_status(f, '(MESSAGES RECENT UNSEEN)')
             if result == 'OK':
@@ -623,8 +629,8 @@ def _consolidate(data):
     _debug(lambda: "consolidate in: " + repr(data))
 
     str_list = []
-    for k, g in groupby(enumerate(data), lambda (i,x):i-x):
-        ilist = map(itemgetter(1), g)
+    for k, g in groupby(enumerate(data), lambda v:v[0]-v[1]):
+        ilist = list(map(itemgetter(1), g))
         _debug(lambda: "_consolidating: " + repr(ilist))
         if len(ilist) > 1:
             str_list.append('%d-%d' % (ilist[0], ilist[-1]))
@@ -763,18 +769,24 @@ def mr(folder, arglist):
 
 
 def _headers_from(msg):
+    """ lines until a blank one """
+    # return '\n'.join(itertools.takewhile(lambda x: x, msg.split("\r\n"))) + "\n"
     result = ""
-    for line in msg.split(b"\r\n"):
+    for line in msg.split("\r\n"):
         if line:
-            result += line + b"\n"
+            result += line + "\n"
         else:
             return result
     return result
 
 
 def _show(folder, msgset):
-    '''common code for show/next/prev'''
+    '''common code for show/next/prev
+       return the number of the last message shown, or None
+    '''
     import email
+    from email.policy import default
+
     enable_pager()
     outputfunc = print
     with Connection(folder) as S:
@@ -783,13 +795,18 @@ def _show(folder, msgset):
         last = None
         for num in msglist[0].split():
             result, data = S.raw_fetch(num, '(RFC822)')
-            outputfunc("(Message %s:%s)\n" % (folder, num))
-            outputfunc(_headers_from(data[0][1]))
-            msg = email.message_from_string(data[0][1])
-            for part in msg.walk():
-                _debug(lambda: "PART %s:" % part.get_content_type())
-                outputfunc(part.get_payload(decode=True))
-            last = num
+            _debug(lambda: "data for %r is : %r" % (num, msglist))
+            outputfunc("(Message %s:%s)\n" % (folder, num.decode()))
+            msgbytes = data[0][1]
+            #outputfunc(_headers_from(msgbytes.decode()))
+            msg = email.message_from_bytes(msgbytes, policy=default)
+            outputfunc(msg.as_string(unixfrom=True))
+            #outputfunc(msg.get_body(preferencelist=('related', 'plain', 'html')))
+            #for part in msg.walk():
+            #    _debug(lambda: "PART %s:" % part.get_content_type())
+            #    msg = part.get_payload(0).decode()
+            #    outputfunc(msg)
+            last = int(num)
     return last
 
 
@@ -799,7 +816,7 @@ def show(folder, arglist):
 
     Show the specified messages, or the current message if none specified
     '''
-    folder = state['folder'] = folder or state['folder']
+    folder = state['folder'] = folder if folder else state['folder']
     msgset = msgset_from(arglist) or _cur_msg(folder)
     _checkMsgset(msgset)
     shown = _show(folder, msgset)
@@ -859,7 +876,7 @@ def scan(folder, arglist):
             env_date = ' '.join(str(env_date).split()[:len(fmt.split())])
             dt = time.strptime(env_date, fmt)
             outtime = time.strftime("%m/%d", dt)
-        except Exception, e:
+        except Exception as e:
             _debug(lambda: "strptime exception: " + repr(e))
             outtime = "??/??"
         if type(env_from) == type([]):
@@ -891,7 +908,7 @@ def scan(folder, arglist):
     with Connection(folder) as S:
         data = S.fetch(msgset, '(ENVELOPE FLAGS)', errmsg = "Problem with fetch:" )
         # take out fake/bad hits
-        data = [ hit for hit in data if hit and ' ' in hit ]
+        data = [ hit for hit in data if hit and b' ' in hit ]
         if data == [] or data[0] is None:
             print("No messages.")
             sys.exit(0)
@@ -901,8 +918,8 @@ def scan(folder, arglist):
             cur = None
         for hit in data:
             _debug(lambda: 'Hit: %s' % (repr(hit)))
-            num, e = hit.split(' ',1)
-            num = string.atoi(num)
+            num, e = hit.split(b' ',1)
+            num = int(num)
             _debug(lambda: "e: %s" % repr(e))
             e = readsexpr(e)
             env_date, env_subj, env_from, env_sender = e[1][:4]
@@ -925,14 +942,9 @@ def help(args):
     Shows help on the specified command.
     '''
 
-    def _sort(foo):
-        bar = foo
-        bar.sort()
-        return bar
-
     if len(args) < 1:
         print(help.__doc__)
-        print("Valid commands: %s " % (', '.join(_sort(Commands.keys()))))
+        print("Valid commands: %s " % (', '.join(sorted(Commands.keys()))))
         sys.exit(0)
     else:
         cmd = args[0]
@@ -962,11 +974,6 @@ Commands = { 'folders': folders,
 
 def _dispatch(args):
 
-    def _sort(foo):
-        bar = foo
-        bar.sort()
-        return bar
-
     _debug(lambda: "args: %s" % repr(args))
     if len(args) > 1:
         cmd = args[1]
@@ -986,9 +993,9 @@ def _dispatch(args):
             config.write()
             state.write()
         else:
-            print("Unknown command %s.  Valid ones: %s " % (cmd, ', '.join(_sort(Commands.keys()))))
+            print("Unknown command %s.  Valid ones: %s " % (cmd, ', '.join(sorted(Commands.keys()))))
     else:
-        print("Must specify a command.  Valid ones: %s " % ', '.join(_sort(Commands.keys())))
+        print("Must specify a command.  Valid ones: %s " % ', '.join(sorted(Commands.keys())))
 
 
 def cmd_main():

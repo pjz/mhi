@@ -1,13 +1,15 @@
 
 PROJ=mhi
 
-PIP=./env/bin/pip
-PYTEST=./env/bin/py.test
+VENV=./env
+PIP=$(VENV)/bin/pip
+PYTEST=$(VENV)/bin/pytest
 PYTEST_ARGS=-v --timeout=60
 PYTHON=python
 
-env:
-	virtualenv --python=python2.7 env
+
+venv $(VENV):
+	virtualenv --python=python3 $(VENV)
 	$(PIP) install -e .
 
 test: env
@@ -15,6 +17,7 @@ test: env
 		$(PIP) install pytest ;\
 		$(PIP) install pytest-runfailed ;\
 		$(PIP) install pytest-timeout ;\
+		$(PIP) install mock ;\
 	fi
 	cd tests && ../$(PYTEST) $(PYTEST_ARGS)
 
