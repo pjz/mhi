@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 
-
 """Test helpers"""
-
 
 import sys
 import copy

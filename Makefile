@@ -4,7 +4,7 @@ PROJ=mhi
 VENV=./env
 PIP=$(VENV)/bin/pip
 PYTEST=$(VENV)/bin/pytest
-PYTEST_ARGS=-v --timeout=60
+PYTEST_ARGS=-v --timeout=60 $(PYTEST_EXTRA)
 PYTHON=python
 
 
