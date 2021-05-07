@@ -7,6 +7,14 @@ PYTEST=$(VENV)/bin/pytest
 PYTEST_ARGS=-v --timeout=60 $(PYTEST_EXTRA)
 PYTHON=python
 
+help:
+	@echo "venv - make the venv in $(VENV)"
+	@echo "test - run tests"
+	@echo "testf - run tests until first fail"
+	@echo "wheel - build a python wheel"
+	@echo "release - release the current version to pypi"
+	@echo "clean - nuke build artifacts"
+
 
 venv $(VENV):
 	virtualenv --python=python3 $(VENV)
