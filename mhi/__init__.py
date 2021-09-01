@@ -19,7 +19,6 @@
 # everything else Copyright Paul Jimenez, released under the GPL
 # canonical copy at http://www.place.org/~pj/software/mhi
 
-
 import os
 import sys
 import time
@@ -28,6 +27,7 @@ import shutil
 import string
 import imaplib
 import smtplib
+from functools import wraps
 from io import StringIO
 from pathlib import Path
 from urllib import parse as urlparse
@@ -225,10 +225,10 @@ def _argFolder(args, default=None):
 
 
 def takesFolderArg(f):
+    @wraps(f)
     def parseFolderArg(args):
         folder, outargs = _argFolder(args)
         return f(folder, outargs)
-    parseFolderArg.__doc__ = f.__doc__
     return parseFolderArg
 
 
