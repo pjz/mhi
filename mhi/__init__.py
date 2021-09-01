@@ -47,7 +47,7 @@ def _debug_noop(*args):
 def _debug_stdout(arg):
     f = arg
     if not callable(arg):
-        f = lambda : arg
+        f = lambda: arg
     print("DEBUG: ", f())
 
 
@@ -371,13 +371,13 @@ def _crlf_terminate(msgfile):
     '''convenience function to turn a \n terminated file into a \r\n terminated file'''
     tfile = tempFileName(prefix="mhi")
     os.rename(msgfile, tfile)
-    with open(tfile, 'r') as inf:
-        with open(msgfile, 'w') as outf:
-            for line in inf:
+    with open(tfile, 'r') as infile:
+        with open(msgfile, 'w') as outfile:
+            for line in infile:
                 if not line.endswith('\r\n'):
                     line = line[:-1]  # strip existing \n (or \r?)
                     line += '\r\n'    # add new lineending
-                outf.write(line)
+                outfile.write(line)
 
 
 def _edit(msgfile):
