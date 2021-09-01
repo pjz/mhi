@@ -350,13 +350,35 @@ def msgset_from(arglist):
 
 
 def _checkMsgset(msgset):
-    '''Stub to check that a specified string has the grammar of a msgset'''
-    # FIXME: need a better check that msgset is a valid imap messageset string
+    '''Check that a specified string has the grammar of a msgset'''
     # msgset = int | int:int | msgset,msgset
     # '1', '1:5', '1,2,3', '1,3:5' are all valid
-    if len(msgset.strip('1234567890,:*')) != 0:
+    def fail():
         print(f"{msgset} isn't a valid messageset. Try again.")
         sys.exit(1)
+
+    if len(msgset.strip('1234567890,:*')) != 0:
+        fail()
+
+    prev = msgset[0]
+    if prev in (':', ','):
+        fail()
+
+    digits = set(str(i) for i in range(10))
+
+    def is_valid(r):
+        rcount = r.count(':')
+        if rcount == 0 and all(c in digits for c in r):
+            return True
+        if rcount != 1:
+            return False
+        start, end = r.split(':')
+        if any(c not in digits for c in start):
+            return False
+        return end == '*' or all(c in digits for c in end)
+
+    if any(not is_valid(r) for r in msgset.split(',')):
+        fail()
 
 
 def tempFileName(*args, **kwargs):
