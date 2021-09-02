@@ -1,0 +1,6 @@
+-c requirements.txt
+mock
+pytest
+pytest-runfailed
+pytest-timeout
+

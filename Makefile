@@ -1,14 +1,14 @@
 
 PROJ=mhi
 
-VENV=./env
-PIP=$(VENV)/bin/pip
-PYTEST=$(VENV)/bin/pytest
-PYTEST_ARGS=-v --timeout=60 $(PYTEST_EXTRA)
+include reqs/Makefile.piptools
+
 PYTHON=python
 
-help:
-	@echo "venv - make the venv in $(VENV)"
+DEV_ENV=.pip_syncd
+
+default::
+	@echo "dev - set up the dev venv"
 	@echo "test - run tests"
 	@echo "testf - run tests until first fail"
 	@echo "wheel - build a python wheel"
@@ -16,30 +16,24 @@ help:
 	@echo "clean - nuke build artifacts"
 
 
-venv $(VENV):
-	virtualenv --python=python3 $(VENV)
-	$(PIP) install -e .
+$(DEV_ENV): $(DEPS)
+	pip-sync $(DEPS)
+	touch $(DEV_ENV)
 
-test: env
-	if [ ! -f $(PYTEST) ]; then \
-		$(PIP) install pytest ;\
-		$(PIP) install pytest-runfailed ;\
-		$(PIP) install pytest-timeout ;\
-		$(PIP) install mock ;\
-	fi
-	cd tests && ../$(PYTEST) $(PYTEST_ARGS)
+.PHONY: dev
+dev: $(DEV_ENV)
 
-testf: env
-	cd tests && ../$(PYTEST) --failed $(PYTEST_ARGS)
+PYTEST_ARGS=-v --timeout=60 $(PYTEST_EXTRA)
 
-testf-clean: env clean-testf
-	cd tests && ../$(PYTEST) --failed $(PYTEST_ARGS)
+test: $(DEV_ENV)
+	pytest tests $(PYTEST_ARGS)
 
-clean-testf:
+testf: PYTEST_EXTRA=--log-cli-level=DEBUG -ff
+testf: test
+
+clean:
 	rm -rf tests/.pytest
-
-clean: clean-testf
-	rm -rf env build dist *.egg-info
+	rm -rf $(DEV_ENV) build dist *.egg-info
 	find . -name __pycache__ | xargs rm -rf
 	find . -name \*.pyc | xargs rm -f
 
