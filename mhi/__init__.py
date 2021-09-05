@@ -27,6 +27,7 @@ import shutil
 import string
 import imaplib
 import smtplib
+import subprocess
 from functools import wraps
 from io import StringIO
 from pathlib import Path
@@ -232,6 +233,13 @@ def takesFolderArg(f):
     return parseFolderArg
 
 
+def cmd_result(cmd):
+    result = subprocess.run(cmd, capture_output=True, shell=True, check=True)
+    _debug(lambda: f'ran command: {cmd} got result: {result.stdout}')
+    stdout = result.stdout.decode().strip()
+    return stdout
+
+
 class Connection:
     """A wrapper around an IMAP connection"""
 
@@ -247,7 +255,7 @@ class Connection:
             if '@' in netloc:
                 userpass, hostport = netloc.rsplit('@', 1)
             else:
-                userpass, hostport = netloc, 'localhost'
+                userpass, hostport = None, netloc
             if ':' in hostport:
                 host, port = hostport.rsplit(':', 1)
             else:
@@ -255,10 +263,18 @@ class Connection:
                 port = "143"
                 if scheme[-1] == 's':
                     port = "993"
+            user = config.get('connection_user', os.environ.get('USER', ''))
+            passwd = config.get('connection_passwd', os.environ.get('MHI_PASSWD', ''))
             if ':' in userpass:
                 user, passwd = userpass.split(':', 1)
-            else:
-                user, passwd = os.environ.get('USER', ''), userpass
+            elif userpass is not None:
+                user = userpass
+            if not passwd:
+                print("No password provided. Set connnetion_password or put it in the url or in MHI_PASSWD environment var")
+                sys.exit(1)
+            if passwd.startswith('`') and passwd.endswith('`'):  # shell eval it
+                cmd = passwd[1:-1]
+                passwd = cmd_result(cmd)
             _debug(lambda: f"{scheme} connection to {user} : {passwd} @ {host}:{port}")
             session = schemes[scheme](host, int(port))
             session.login(user, passwd)

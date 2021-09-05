@@ -25,6 +25,24 @@ via:
 
       python -m mhi.mklinks <destdir>
 
+.mhirc
+------
+
+.mhirc is an ini-style config file (parsed with configobj).  Useful keys:
+
+ * connection: an imap[s]://user@host:port/path url string that
+ specifies how to connect to the imap server
+
+ * connection_passwd: the password to use when connection. To avoid putting the
+ password in plaintext in this file, if the string is surrounded by backticks
+ (`), it will be executed as a shell script whose stdout will be used as the
+ password.
+
+ * comp_template: a template to use when writing new emails
+
+ * repl_template: a template to use when replying to emails
+
+
 TODO:
 -----
 
