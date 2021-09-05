@@ -28,7 +28,7 @@ PYTEST_ARGS=-v --timeout=60 $(PYTEST_EXTRA)
 test: $(DEV_ENV)
 	pytest tests $(PYTEST_ARGS)
 
-testf: PYTEST_EXTRA=--log-cli-level=DEBUG -ff
+testf: PYTEST_EXTRA=--log-cli-level=DEBUG --ff
 testf: test
 
 clean:

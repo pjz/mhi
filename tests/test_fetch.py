@@ -55,17 +55,21 @@ reference_mail = {
     ]
 }
 
-def setUp():
+
+def setup_method():
     mhi.config['connection'] = "imaps://user:password@host/"
     mhi.config['folder_prefix'] = ""
+
 
 def test_show():
     mhi.config['connection'] = "imaps://user:password@host/"
     mhi.show(["++INBOX", "1"])
 
+
 def test_folder():
     mhi.config['connection'] = "imaps://user:password@host/"
     mhi.folder(["++INBOX"])
+
 
 def test_folders():
     mhi.config['connection'] = "imaps://user:password@host/"

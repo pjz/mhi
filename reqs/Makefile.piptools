@@ -22,7 +22,7 @@ $(DEPS): %.txt: %.in
 reqs/dev-requirements.txt: reqs/requirements.txt
 
 .PHONY: install-deps
-install-deps: $(DEPS)
+install-deps:
 	pip-sync $(DEPS)
 
 .PHONY: update-deps

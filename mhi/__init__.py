@@ -62,7 +62,7 @@ def sexpr_readsexpr(s):
 
 def readlisp_readsexpr(s):
     from .readlisp import readlisp
-    return readlisp(s.decode() if type(s) != str else s)
+    return readlisp(tostr(s))
 
 
 readsexpr = readlisp_readsexpr
@@ -200,35 +200,31 @@ class UsageError(Exception):
     pass
 
 
-def _argFolder(args, default=None):
-    '''
-    parse the args into a folder-spec (denoted by a leading +, last of
-    which is used if multiple are listed), and the rest of the args
-    '''
-    folder = None
-    outargs = []
-    for a in args:
-        if a.startswith('+') and len(a) > 1:
-            folder = a[1:]
-        else:
-            outargs.append(a)
-    if folder is None:
-        # nothing specified, use the default folder
-        folder = default
-    elif folder.startswith('+'):
-        # double leading + means ignore the folder prefix
-        folder = folder[1:]
-    else:
-        prefix = config.get('folder_prefix', '')
-        folder = prefix + folder
-
-    return folder, outargs
-
-
 def takesFolderArg(f):
     @wraps(f)
     def parseFolderArg(args):
-        folder, outargs = _argFolder(args)
+        '''
+        parse the args into a folder-spec (denoted by a leading +, last of
+        which is used if multiple are listed), and the rest of the args
+        '''
+        folder = None
+        outargs = []
+        for a in args:
+            if a.startswith('+') and len(a) > 1:
+                folder = a[1:]
+            else:
+                outargs.append(a)
+
+        if folder is None:
+            # nothing specified, use the default folder
+            folder = None
+        elif folder.startswith('+'):
+            # double leading + means ignore the folder prefix
+            folder = folder[1:]
+        else:
+            prefix = config.get('folder_prefix', '')
+            folder = prefix + folder
+
         return f(folder, outargs)
     return parseFolderArg
 
@@ -236,8 +232,20 @@ def takesFolderArg(f):
 def cmd_result(cmd):
     result = subprocess.run(cmd, capture_output=True, shell=True, check=True)
     _debug(lambda: f'ran command: {cmd} got result: {result.stdout}')
-    stdout = result.stdout.decode().strip()
+    stdout = tostr(result.stdout).strip()
     return stdout
+
+
+def tostr(s):
+    '''
+    decode s if it's bytes, return it if it's a str, else do str() on it
+    '''
+    if type(s) == str:
+        return s
+    elif type(s) == bytes:
+        return s.decode()
+    else:
+        return str(s)
 
 
 class Connection:
@@ -283,8 +291,8 @@ class Connection:
         session.debug = 0 if _debug == _debug_noop else 4
         self.session = session
         if startfolder is None:
-            startfolder = state['folder']
-        die_on_error(session.select)(startfolder, errmsg=f"Problem changing to folder {folder}:")
+            startfolder = state.get('folder', 'INBOX')
+        self.select(startfolder)
         state['folder'] = startfolder
 
     def __enter__(self):
@@ -310,13 +318,41 @@ class Connection:
             return result
         return die_on_error(result)
 
+    def select(self, folder, errmsg=None):
+        errmsg = errmsg or f"Problem changing to folder {folder}:"
+        return die_on_error(self.session.select)(folder, errmsg=errmsg)
+
+    def folders(self):
+        result, flist = self.raw_list()
+        # check result
+        folders = []
+        _debug(lambda: f"flist: {flist!r} ")
+        for fline in flist:
+            fstr = tostr(fline)
+            f = str(readsexpr(f'({fstr})')[2])
+            _debug(lambda: f" f: {f!r}")
+            folders.append(f)
+        return folders
+
+    def folderstatus(self, folder):
+        result, data = self.raw_status(folder, '(MESSAGES RECENT UNSEEN)')
+        if result != 'OK':
+            return ()
+        stats = readsexpr(f'({tostr(data[0])})')[1]
+        msgs, recent, unseen = stats[1], stats[3], stats[5]
+        return msgs, recent, unseen
+
 
 def die_on_error(f):
     def _die_on_err_wrapper(*args, **kwargs):
         msgstr = kwargs.get('errmsg', 'There was a problem:')
         if 'errmsg' in kwargs:
             del kwargs['errmsg']
-        result, data = f(*args, **kwargs)
+        try:
+            result, data = f(*args, **kwargs)
+        except imaplib.IMAP4.error as e:
+            result = "IMAP error"
+            data = str(e)
         if result != 'OK':
             print(f'{msgstr} {result}: {data}')
             sys.exit(1)
@@ -610,7 +646,9 @@ def folder(folder, arglist):
     if arglist:
         raise UsageError()
     if folder is None:
-        folder = state['folder']
+        folder = state.get('folder')
+    if folder is None:
+        print("No current folder selected. Use 'folders' to get a list.")
     with Connection() as S:
         msgcount = _selectOrCreate(S, folder)
     state['folder'] = folder
@@ -627,26 +665,17 @@ def folders(args):
     enable_pager()
     HEADER = "FOLDER"
     with Connection() as S:
-        result, flist = S.raw_list()
-        _debug(lambda: f"flist: {flist!r} ")
         stats = {}
-        for fline in flist:
-            fstr = fline if isinstance(fline, str) else fline.decode('utf8')
-            f = str(readsexpr(f'({fstr})')[2])
-            _debug(lambda: f" f: {f!r}")
-            result, data = S.raw_status(f, '(MESSAGES RECENT UNSEEN)')
-            if result == 'OK':
-                stats[f] = readsexpr('('+data[0]+')')[1]
-    stats[HEADER] = [0, "# MESSAGES", 0, "RECENT", 0, "UNSEEN"]
-    folderlist = [key for key in stats if key != 'FOLDER']
-    folderlist.sort()
+        for f in S.folders():
+            status = S.folderstatus(f)
+            stats[f] = status or (0, 0, 0)
+    stats[HEADER] = ["# MESSAGES", "RECENT", "UNSEEN"]
+    folderlist = sorted(key for key in stats if key != HEADER)
     totalmsgs, totalnew = 0, 0
     for folder in [HEADER]+folderlist:
         _debug(lambda: f" folder: {folder!r}")
         iscur = '*' if folder == state['folder'] else ' '
-        foo = stats[folder]
-        _debug(lambda: f"  Stats: {foo!r}")
-        messages, recent, unseen = foo[1], foo[3], foo[5]
+        messages, recent, unseen = stats[folder]
         cur = state.get(f'{folder}.cur', ['-', 'CUR'][folder == HEADER])
         foldr = folder_name(folder)
         print(f"{iscur}{foldr:>20} {cur:7} {messages:7} {recent:7} {unseen:7}")
@@ -726,7 +755,7 @@ def refile(destfolder, arglist):
     _checkMsgset(msgset)
     with Connection() as S:
         _selectOrCreate(S, destfolder)
-        S.select(srcfolder, errmsg=f"Problem changing to folder {srcfolder}:")
+        S.select(srcfolder)
         S.copy(msgset, destfolder, errmsg="Problem with copy:")
         data = S.search(None, msgset, errmsg="Problem with search:")
         print("Refiling... ",)
@@ -755,7 +784,7 @@ def rmf(folder, arglist):
         else:
             if state['folder'] == folder:
                 state['folder'] = 'INBOX'
-            S.select(state['folder'], errmsg=f"Problem changing to folder {state['folder']}:")
+            S.select(state['folder'])
             result, data = S.raw_delete(folder)
     if result == 'OK':
         print(f"Folder '{folder}' deleted.")
@@ -832,10 +861,11 @@ def _show(folder, msgset):
         msglist = S.search(None, msgset, errmsg="Problem with search:")
         _debug(lambda: f"SEARCH returned: {msglist!r}")
         last = None
-        for num in msglist[0].split():
+        nums = tostr(msglist[0])
+        for num in nums.split():
             result, data = S.raw_fetch(num, '(RFC822)')
             _debug(lambda: f"data for {num!r} is: {msglist!r}")
-            outputfunc(f"(Message {folder}:{num.decode()})\n")
+            outputfunc(f"(Message {folder}:{num})\n")
             msgbytes = data[0][1]
             # outputfunc(_headers_from(msgbytes.decode()))
             msg = email.message_from_bytes(msgbytes, policy=default)
@@ -931,7 +961,7 @@ def scan(folder, arglist):
             status = 'N'
         else:
             status = 'O'
-        return f'{num:4} {status} {outtime} {outfrom[:18]:-18} '
+        return f'{num:4} {status} {outtime} {outfrom[:18]} '
 
     enable_pager()
     subjlen = 47
@@ -944,7 +974,7 @@ def scan(folder, arglist):
     with Connection(folder) as S:
         data = S.fetch(msgset, '(ENVELOPE FLAGS)', errmsg="Problem with fetch:" )
         # take out fake/bad hits
-        data = [hit for hit in data if hit and b' ' in hit]
+        data = [tostr(hit) for hit in data if hit and b' ' in hit]
         if data == [] or data[0] is None:
             print("No messages.")
             sys.exit(0)
@@ -954,7 +984,7 @@ def scan(folder, arglist):
             cur = None
         for hit in data:
             _debug(lambda: f'{hit=}')
-            num, e = hit.split(b' ', 1)
+            num, e = hit.split(' ', 1)
             num = int(num)
             _debug(lambda: f'{e=}')
             e = readsexpr(e)
