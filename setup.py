@@ -29,7 +29,7 @@ classifiers = [ 'Development Status :: 5 - Production/Stable'
               , 'Operating System :: MacOS :: MacOS X'
               , 'Operating System :: Microsoft :: Windows'
               , 'Operating System :: POSIX'
-              , 'Programming Language :: Python :: 2.7'
+              , 'Programming Language :: Python :: 3.8'
               , 'Programming Language :: Python :: Implementation :: CPython'
               , 'Topic :: Communications :: Email :: Email Clients (MUA)'
               ]
@@ -45,7 +45,7 @@ setup( author = 'Paul Jimenez'
                                             ,'mhiWrap = mhi:cmd_main'
                                             ]}
      # there must be nothing on the following line after the = other than a string constant
-     , version = '0.6.7'
+     , version = '0.7.0'
      , install_requires = req_packages
      , zip_safe = False
      , extras_require = { 'dev': req_dev_packages }
