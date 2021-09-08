@@ -30,23 +30,26 @@ via:
 
 .mhirc is an ini-style config file (parsed with configobj).  Useful keys:
 
- * connection: an imap[s]://user@host:port/path url string that
+ * `connection` - an imap[s]://[username[:password]]@host[:port]/path url string that
  specifies how to connect to the imap server
 
- * connection_passwd: the password to use when connection. To avoid putting the
+ * `connection_passwd` - the password to use when connection. To avoid putting the
  password in plaintext in this file, if the string is surrounded by backticks
  (`), it will be executed as a shell script whose stdout will be used as the
  password.
 
- * comp_template: a template to use when writing new emails
+ * `folder_prefix` - the prefix to add to your IMAP folders
 
- * repl_template: a template to use when replying to emails
+ * `comp_template` - the template put into your editor when you use `comp` to write new mail
+
+ * `repl_template` - the template put into your editor when you `repl`y to a message
+
 
 
 TODO:
 -----
 
- * use click
+ * use click - but would require new commands?
  * more help - should be self-documenting
 
 Licensing information is in the LICENSE file. (short version: GPLv3 or CCBYSA)
