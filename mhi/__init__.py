@@ -746,11 +746,16 @@ def refile(destfolder, arglist):
     '''Usage: refile <messageset> +<folder>
 
     Moves a set of messages from the current folder to a new one.
+    Add -k to keep the originals (making this a 'copy' instead of a 'refile').
     '''
     if destfolder is None:
         print("Error: Destination folder must be specified.")
         raise UsageError()
     srcfolder = state["folder"]
+    keep = '-k' in arglist
+    if keep:
+        arglist.remove('-k')
+
     msgset = msgset_from(arglist) or _cur_msg(srcfolder)
     _checkMsgset(msgset)
     with Connection() as S:
@@ -758,13 +763,17 @@ def refile(destfolder, arglist):
         S.select(srcfolder)
         S.copy(msgset, destfolder, errmsg="Problem with copy:")
         data = S.search(None, msgset, errmsg="Problem with search:")
-        print("Refiling... ",)
         msgnums = data[0].split()
-        for num in msgnums:
-            S.raw_store(num, '+FLAGS', '\\Deleted')
-            print(".", )
-        S.expunge()
-        print(f"{len(msgnums)} messages refiled to '{destfolder}'.")
+        if keep:
+            action = 'copied'
+        else:
+            action = 'refiled'
+            print("Refiling... ",)
+            for num in msgnums:
+                S.raw_store(num, '+FLAGS', '\\Deleted')
+                print(".", )
+            S.expunge()
+        print(f"{len(msgnums)} messages {action} to '{destfolder}'.")
     print("Done.")
 
 
