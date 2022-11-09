@@ -4,7 +4,7 @@
 #
 #    pip-compile reqs/dev-requirements.in
 #
-attrs==21.2.0
+attrs==22.1.0
     # via pytest
 bleach==5.0.1
     # via readme-renderer
@@ -20,6 +20,8 @@ cryptography==38.0.3
     # via secretstorage
 docutils==0.19
     # via readme-renderer
+exceptiongroup==1.0.1
+    # via pytest
 idna==3.4
     # via requests
 importlib-metadata==5.0.0
@@ -40,13 +42,11 @@ mock==4.0.3
     # via -r reqs/dev-requirements.in
 more-itertools==9.0.0
     # via jaraco-classes
-packaging==21.0
+packaging==21.3
     # via pytest
 pkginfo==1.8.3
     # via twine
 pluggy==1.0.0
-    # via pytest
-py==1.10.0
     # via pytest
 pycparser==2.21
     # via cffi
@@ -54,16 +54,16 @@ pygments==2.13.0
     # via
     #   readme-renderer
     #   rich
-pyparsing==2.4.7
+pyparsing==3.0.9
     # via packaging
-pytest==6.2.5
+pytest==7.2.0
     # via
     #   -r reqs/dev-requirements.in
     #   pytest-runfailed
     #   pytest-timeout
 pytest-runfailed==0.6
     # via -r reqs/dev-requirements.in
-pytest-timeout==1.4.2
+pytest-timeout==2.1.0
     # via -r reqs/dev-requirements.in
 readme-renderer==37.3
     # via twine
@@ -83,7 +83,7 @@ six==1.16.0
     # via
     #   -c reqs/requirements.txt
     #   bleach
-toml==0.10.2
+tomli==2.0.1
     # via pytest
 twine==4.0.1
     # via -r reqs/dev-requirements.in

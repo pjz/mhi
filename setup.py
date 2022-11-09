@@ -16,7 +16,6 @@ def read_reqs(filename):
                 yield line
 
 
-req_dev_packages = list(read_reqs("reqs/dev-requirements.in"))
 req_packages = list(read_reqs("reqs/requirements.in"))
 
 classifiers = [ 'Development Status :: 5 - Production/Stable'
@@ -45,9 +44,8 @@ setup( author = 'Paul Jimenez'
                                             ,'mhiWrap = mhi:cmd_main'
                                             ]}
      # there must be nothing on the following line after the = other than a string constant
-     , version = '0.8.1'
+     , version = '0.8.2'
      , install_requires = req_packages
      , zip_safe = False
-     , extras_require = { 'dev': req_dev_packages }
       )
 
