@@ -626,7 +626,7 @@ def _selectOrCreate(S, folder):
             print("Nothing done. exiting.")
             sys.exit(1)
     else:
-        msgcount = data[0]
+        msgcount = data[0].decode()
     return msgcount
 
 
@@ -970,7 +970,7 @@ def scan(folder, arglist):
             status = 'N'
         else:
             status = 'O'
-        return f'{num:4} {status} {outtime} {outfrom[:18]} '
+        return f'{num:4} {status} {outtime} {outfrom[:18]:<18} '
 
     enable_pager()
     subjlen = 47
