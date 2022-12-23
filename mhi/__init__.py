@@ -943,7 +943,7 @@ def scan(folder, arglist):
     '''
 
     def summarize_envelope(env_date, env_from, env_sender, flags):
-        _debug(lambda: f"{env_date=}\n{env_from=}\n{env_sender=}\n{flags=}")
+        _debug(lambda: f"env_date={env_date}\nenv_from={env_from}\nenv_sender={env_sender}\nflags={flags}")
         try:
             fmt = "%d %b %Y %H:%M:%S"
             if ',' in env_date:
@@ -992,13 +992,13 @@ def scan(folder, arglist):
         except:
             cur = None
         for hit in data:
-            _debug(lambda: f'{hit=}')
+            _debug(lambda: f'hit={hit}')
             num, e = hit.split(' ', 1)
             num = int(num)
-            _debug(lambda: f'{e=}')
+            _debug(lambda: f'e={e}')
             e = readsexpr(e)
             env_date, env_subj, env_from, env_sender = e[1][:4]
-            _debug(lambda: f'{env_subj=}')
+            _debug(lambda: f'env_subj={env_subj}')
             flags = [str(f) for f in e[3]]
 
             outenv = summarize_envelope(env_date, env_from, env_sender, flags)
@@ -1050,20 +1050,20 @@ CommandList = ', '.join(sorted(Commands.keys()))
 
 def _dispatch(args):
 
-    _debug(lambda: f"{args=}")
+    _debug(lambda: f"args={args}")
     if len(args) <= 1:
         print(f"Must specify a command.  Valid ones: {CommandList}")
         return
     cmd = args[1]
-    _debug(lambda: f"{cmd=}")
+    _debug(lambda: f"cmd={cmd}")
     cmdargs = args[2:]
-    _debug(lambda: f"{cmdargs=}")
-    _debug(lambda: f"{Commands=}")
+    _debug(lambda: f"cmdargs={cmdargs}")
+    _debug(lambda: f"Commands={Commands}")
     cmdfunc = Commands.get(cmd, None)
     if not cmdfunc:
         print(f"Unknown command {cmd}.  Valid ones: {CommandList}")
         return
-    _debug(lambda: f"{cmdfunc=}")
+    _debug(lambda: f"cmdfunc={cmdfunc}")
     try:
         cmdfunc(cmdargs)
     except IOError:
