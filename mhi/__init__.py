@@ -612,22 +612,20 @@ def repl(args):
         os.unlink(tmpfile)
 
 
-def _selectOrCreate(S, folder):
-    msgcount = '0'
-    result, data = S.raw_select(folder)
+def _selectOrCreate(conn, folder) -> str:
+    result, data = conn.raw_select(folder)
     _debug(lambda: f" Result: {result}, {data} ")
-    if result != 'OK':
-        print(f"Folder '{folder}' doesn't exist.  Create it? ")
-        answer = sys.stdin.readline().strip().lower()
-        if answer.startswith('y'):
-            S.create(folder, errmsg="Problem creating folder:")
-            S.select(folder, errmsg="Problem selecting newly created folder:")
-        else:
-            print("Nothing done. exiting.")
-            sys.exit(1)
+    if result == 'OK':
+        return tostr(data[0])
+    print(f"Folder '{folder}' doesn't exist.  Create it? ")
+    answer = sys.stdin.readline().strip().lower()
+    if answer.startswith('y'):
+        conn.create(folder, errmsg="Problem creating folder:")
+        conn.select(folder, errmsg="Problem selecting newly created folder:")
     else:
-        msgcount = data[0].decode()
-    return msgcount
+        print("Nothing done. exiting.")
+        sys.exit(1)
+    return '0'
 
 
 def folder_name(folder):

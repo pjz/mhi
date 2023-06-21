@@ -44,7 +44,7 @@ setup( author = 'Paul Jimenez'
                                             ,'mhiWrap = mhi:cmd_main'
                                             ]}
      # there must be nothing on the following line after the = other than a string constant
-     , version = '0.8.2'
+     , version = '0.8.3'
      , install_requires = req_packages
      , zip_safe = False
       )
