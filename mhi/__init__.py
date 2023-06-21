@@ -857,12 +857,13 @@ def _headers_from(msg):
 
 def _show(folder, msgset):
     '''common code for show/next/prev
-       return the number of the last message shown, or None
+       updates folder's cur pointer
     '''
     import email
     from email.policy import default
 
     enable_pager()
+    last = None
     outputfunc = print
     with Connection(folder) as S:
         msglist = S.search(None, msgset, errmsg="Problem with search:")
@@ -883,7 +884,8 @@ def _show(folder, msgset):
             #     msg = part.get_payload(0).decode()
             #     outputfunc(msg)
             last = int(num)
-    return last
+    if last:
+        state[folder+'.cur'] = last
 
 
 @takesFolderArg
@@ -895,9 +897,7 @@ def show(folder, arglist):
     folder = state['folder'] = folder if folder else state['folder']
     msgset = msgset_from(arglist) or _cur_msg(folder)
     _checkMsgset(msgset)
-    shown = _show(folder, msgset)
-    if shown:
-        state[folder+'.cur'] = shown
+    _show(folder, msgset)
 
 
 @takesFolderArg
@@ -912,9 +912,7 @@ def next(folder, arglist):
         cur = int(state[folder+'.cur']) + 1
     except KeyError:
         cur = 1
-    shown = _show(folder, str(cur))
-    if shown:
-        state[folder+'.cur'] = shown
+    _show(folder, str(cur))
 
 
 @takesFolderArg
@@ -928,9 +926,7 @@ def prev(folder, arglist):
         cur = int(state[folder+'.cur']) - 1
     except KeyError:
         cur = 1
-    shown = _show(folder, str(cur))
-    if shown:
-        state[folder+'.cur'] = shown
+    _show(folder, str(cur))
 
 
 @takesFolderArg
