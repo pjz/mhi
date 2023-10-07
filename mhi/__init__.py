@@ -360,16 +360,26 @@ def die_on_error(f):
     return _die_on_err_wrapper
 
 
-def enable_pager():
-    if sys.stdout.isatty():
-        pager = os.environ.get('PAGER', None)
-        if pager is None:
-            for p in ['/usr/bin/less', '/bin/more']:
-                if Path(p).exists():
-                    pager = p
-                    break
-        if pager is not None:
-            sys.stdout = os.popen(pager, 'w')
+def _get_pager_name():
+    for p in (os.environ.get('PAGER', ''), '/usr/bin/less', '/bin/more', 'cat'):
+        if Path(p).is_file():
+            return p
+    return None
+
+
+def paged(f):
+    @wraps(f)
+    def wrapper(*a, **kw):
+
+        try:
+            with subprocess.Popen([_get_pager_name()], stdin=subprocess.PIPE, text=True) as p:
+                sys.stdout = p.stdin
+                return f(*a, **kw)
+        finally:
+            sys.stdout = sys.__stdout__
+
+    pager = _get_pager_name()
+    return wrapper if pager else f
 
 
 def msgset_from(arglist):
@@ -655,12 +665,12 @@ def folder(folder, arglist):
     print(f"Folder {folder_name(folder)} has {msgcount} messages, cur is {cur}.")
 
 
+@paged
 def folders(args):
     '''Usage: folders
 
     Show all folders
     '''
-    enable_pager()
     HEADER = "FOLDER"
     with Connection() as S:
         stats = {}
@@ -855,6 +865,7 @@ def _headers_from(msg):
     return result
 
 
+@paged
 def _show(folder, msgset):
     '''common code for show/next/prev
        updates folder's cur pointer
@@ -862,13 +873,10 @@ def _show(folder, msgset):
     import email
     from email.policy import default
 
-    enable_pager()
-    last = None
     outputfunc = print
     with Connection(folder) as S:
         msglist = S.search(None, msgset, errmsg="Problem with search:")
         _debug(lambda: f"SEARCH returned: {msglist!r}")
-        last = None
         nums = tostr(msglist[0])
         for num in nums.split():
             result, data = S.raw_fetch(num, '(RFC822)')
@@ -877,15 +885,13 @@ def _show(folder, msgset):
             msgbytes = data[0][1]
             # outputfunc(_headers_from(msgbytes.decode()))
             msg = email.message_from_bytes(msgbytes, policy=default)
+            state[folder+'.cur'] = int(num)
             outputfunc(msg.as_string(unixfrom=True))
             # outputfunc(msg.get_body(preferencelist=('related', 'plain', 'html')))
             # for part in msg.walk():
             #     _debug(lambda: "PART %s:" % part.get_content_type())
             #     msg = part.get_payload(0).decode()
             #     outputfunc(msg)
-            last = int(num)
-    if last:
-        state[folder+'.cur'] = last
 
 
 @takesFolderArg
@@ -929,6 +935,7 @@ def prev(folder, arglist):
     _show(folder, str(cur))
 
 
+@paged
 @takesFolderArg
 def scan(folder, arglist):
     '''Usage: scan [+<folder>] [messageset]
@@ -966,7 +973,6 @@ def scan(folder, arglist):
             status = 'O'
         return f'{num:4} {status} {outtime} {outfrom[:18]:<18} '
 
-    enable_pager()
     subjlen = 47
     if len(arglist) > 99:
         raise UsageError()
