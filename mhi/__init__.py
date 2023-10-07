@@ -383,7 +383,7 @@ def paged(f):
             sys.stdout = sys.__stdout__
 
     pager = _get_pager_name()
-    return wrapper if pager else f
+    return wrapper if sys.stdout.isatty() and pager else f
 
 
 def msgset_from(arglist):

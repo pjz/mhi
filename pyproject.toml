@@ -1,6 +1,6 @@
 [project]
 name = "mhi"
-version = "0.8.3"
+version = "0.8.4"
 requires-python = ">=3.8"
 description = "MH for IMAP"
 readme = "README.md"
