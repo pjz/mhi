@@ -798,11 +798,11 @@ def rmf(folder, arglist):
         _debug(lambda: f" Result: {result}, {data}")
         if result != 'OK':
             print(f"Folder '{folder}' doesn't exist.")
-        else:
-            if state['folder'] == folder:
-                state['folder'] = 'INBOX'
-            S.select(state['folder'])
-            result, data = S.raw_delete(folder)
+            return
+        if state['folder'] == folder:
+            state['folder'] = 'INBOX'
+        S.select(state['folder'])
+        result, data = S.raw_delete(folder)
     if result == 'OK':
         print(f"Folder '{folder}' deleted.")
     else:
@@ -858,10 +858,9 @@ def _headers_from(msg):
     # return '\n'.join(itertools.takewhile(lambda x: x, msg.split("\r\n"))) + "\n"
     result = ""
     for line in msg.split("\r\n"):
-        if line:
-            result += line + "\n"
-        else:
-            return result
+        if not line:
+            break
+        result += line + "\n"
     return result
 
 
@@ -981,15 +980,15 @@ def scan(folder, arglist):
     msgset = msgset_from(arglist) or "1:*"
     _checkMsgset(msgset)
     with Connection(folder) as S:
-        data = S.fetch(msgset, '(ENVELOPE FLAGS)', errmsg="Problem with fetch:" )
+        data = S.fetch(msgset, '(ENVELOPE FLAGS)', errmsg="Problem with fetch:")
         # take out fake/bad hits
-        data = [tostr(hit) for hit in data if hit and b' ' in hit]
-        if data == [] or data[0] is None:
+        data = [hit for hit in (tostr(h) for h in data if h) if ' ' in hit]
+        if not data:
             print("No messages.")
             sys.exit(0)
         try:
             cur = string.atoi(state[folder+'.cur'])
-        except:
+        except Exception:
             cur = None
         for hit in data:
             _debug(lambda: f'hit={hit}')
