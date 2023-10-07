@@ -4,7 +4,7 @@ MHI
 mhi is a commandline style mailreader in the tradition of mh and nmh,
 but mutated to support IMAP.
 
-[![Build Status](https://travis-ci.org/pjz/mhi.svg?branch=master)](https://travis-ci.org/pjz/mhi)
+[![Build Status](https://github.com/pjz/mhi/actions/workflows/python-test.yml/badge.svg)](https://github.com/pjz/mhi/actions/workflows/python-test.yml)
 
 Why?
 ----
@@ -19,7 +19,7 @@ IMAP folders), so I had to write my own client.  Python's imaplib made this easy
 How?
 ----
 
-As of v0.6.5 MHI is available as a PyPI package (`pip install mhi`)
+As of v0.6.5 MHI is available as a PyPI package (`pipx install mhi`)
 The same version also incorporates the old mkLinks wrapper-script functionality
 via:
 
