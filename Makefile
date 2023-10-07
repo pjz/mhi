@@ -18,6 +18,7 @@ default::
 
 $(DEV_ENV): $(DEPS)
 	pip-sync $(DEPS)
+	pip install -e .
 	touch $(DEV_ENV)
 
 .PHONY: dev

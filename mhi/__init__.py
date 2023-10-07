@@ -27,6 +27,7 @@ import shutil
 import string
 import imaplib
 import smtplib
+import tempfile
 import subprocess
 from functools import wraps
 from io import StringIO
@@ -49,7 +50,7 @@ def _debug_stdout(arg):
     f = arg
     if not callable(arg):
         f = lambda: arg
-    print("DEBUG: ", f())
+    print("DEBUG: ", f(), file=sys.stderr)
 
 
 _debug = _debug_noop
@@ -444,7 +445,6 @@ def _checkMsgset(msgset):
 
 
 def tempFileName(*args, **kwargs):
-    import tempfile
     f = tempfile.NamedTemporaryFile(*args, **kwargs)
     name = f.name
     f.close()
@@ -829,7 +829,7 @@ def rmm(folder, arglist):
         S.expunge(errmsg="Problem expunging deleted messages: ")
         print("Deleted.")
     if data and data[0]:
-        first = data[0].split()[0]
+        first = tostr(data[0]).split()[0]
         # TODO: fix this
         state[folder+'.cur'] = first
 
@@ -1074,20 +1074,20 @@ def _dispatch(args):
     state.write()
 
 
-def cmd_main():
-    # dispatch on program name instead of args[1]
+def _cmd_dispatch(args):
     try:
-        cmd = Path(sys.argv[0]).name
-        args = ['mhi', cmd] + sys.argv[1:]
         _dispatch(args)
     except KeyboardInterrupt:
         print("Interrupted.")
 
 
+def cmd_main():
+    # dispatch on program name instead of args[1]
+    cmd = Path(sys.argv[0]).name
+    _cmd_dispatch(['mhi', cmd] + sys.argv[1:])
+
+
 def main():
     # main program
-    try:
-        _dispatch(sys.argv)
-    except KeyboardInterrupt:
-        print("Interrupted.")
+    _cmd_dispatch(sys.argv)
 
