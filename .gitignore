@@ -8,3 +8,5 @@ __pycache__
 .ropeproject/
 .cache/
 .pip_syncd
+.make-*
+.coverage

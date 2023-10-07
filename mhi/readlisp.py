@@ -9,6 +9,7 @@ from io import StringIO
 EOF = ''
 END_PAREN = ')'
 
+
 class CharFile:
     def __init__(self, file):
         self.file = file
@@ -28,6 +29,7 @@ class CharFile:
     def ungetchar(self, c):
         self.c = c
 
+
 class LispSymbol:
     def __init__(self, name):
         self.name = name
@@ -37,6 +39,7 @@ class LispSymbol:
 
     def __str__(self):
         return self.name
+
 
 class LispReader:
     def __init__(self, file):
@@ -112,7 +115,6 @@ class LispReader:
         return items
 
     def _read_expr(self):
-
         while 1:
             self._skip_whitespace()
 
@@ -128,7 +130,7 @@ class LispReader:
                 return END_PAREN
             elif c == '"':
                 return self._read_string()
-            #elif c == '|':
+            # elif c == '|':
             #    return self.read_quoted_symbol()
             else:
                 self.file.ungetchar(c)
@@ -145,9 +147,9 @@ class LispReader:
 def writelisp(obj):
     """Convert a python object into an equivalent lisp expression."""
 
-    if type(obj) is types.ListType:
+    if isinstance(obj, list):
         return '(%s)' % ' '.join(map(writelisp, obj))
-    elif type(obj) is types.StringType:
+    elif isinstance(obj, str):
         out = '"'
         for c in obj:
             if c in '\\"':
@@ -155,20 +157,21 @@ def writelisp(obj):
             out += c
         out += '"'
         return out
-    elif type(obj) in [types.LongType, types.IntType]:
+    elif isinstance(obj, int):
         return str(obj)
-    elif type(obj) is types.ComplexType:
+    elif isinstance(obj, complex):
         return '#C(%s %s)' % (obj.real, obj.imag)
-    elif obj == None:
+    elif obj is None:
         return 'nil'
     else:
         return repr(obj)
+
 
 def readlisp(text):
     """Read the first lisp expression in the string"""
     return LispReader(StringIO(text))._read_expr()
 
+
 if __name__ == '__main__':
     p = LispReader(open('test.lisp'))
     print(repr(p._read_expr()))
-

@@ -6,16 +6,18 @@ modified to understand \-escaped quotes instead of "" escaping  - pj 20060809
 import string
 
 # tokens
-[T_EOF, T_ERROR, T_SYMBOL, T_STRING,
- T_INTEGER, T_FLOAT, T_OPEN, T_CLOSE] = range(8)
+[T_EOF, T_ERROR, T_SYMBOL, T_STRING, T_INTEGER, T_FLOAT, T_OPEN, T_CLOSE] = range(8)
 # states
 [S_START, S_SYMBOL, S_STRING, S_NUMBER] = range(4)
 
-class SexprError(Exception): pass
+
+class SexprError(Exception):
+    pass
 
 
 class SexprParser:
     """An S-expression parser"""
+
     def __init__(self, input):
         self.line_no = 1
         self.input = input
@@ -102,7 +104,7 @@ class SexprParser:
                 elif c in '0123456789.eE-':
                     token.append(c)
                 else:
-                    return (T_ERROR, f'{self.line_no}: invalid character "{c}" while reading integer' )
+                    return (T_ERROR, f'{self.line_no}: invalid character "{c}" while reading integer')
 
     def parse(self, t=None):
         if not t:
@@ -131,11 +133,13 @@ class SexprParser:
         else:
             return v
 
+
 if __name__ == '__main__':
     import sys
-    #import profile
+
+    # import profile
     p = SexprParser(sys.stdin)
-    #profile.run('p.parse()')
+    # profile.run('p.parse()')
     while 1:
         e = p.parse()
         print(e)

@@ -1,59 +1,86 @@
 
-PROJ=mhi
+PROJ=$(shell grep ^name pyproject.toml | cut -d\" -f2)
+VERSION=$(shell grep ^version pyproject.toml | cut -d\" -f2)
 
-include reqs/Makefile.piptools
+include Makefile.pyproject
 
-PYTHON=python
-
-DEV_ENV=.pip_syncd
 
 default::
-	@echo "dev - set up the dev venv"
 	@echo "test - run tests"
 	@echo "testf - run tests until first fail"
-	@echo "wheel - build a python wheel"
-	@echo "release - release the current version to pypi"
+	@echo "git-release - release the current version to pypi"
+	@echo "pypi-release - release the current version to pypi"
+	@# from Makefile.pyproject
 	@echo "clean - nuke build artifacts"
 
 
-$(DEV_ENV): $(DEPS)
-	pip-sync $(DEPS)
-	pip install -e .
-	touch $(DEV_ENV)
+mypy pylint test coverage.xml coverage-html.zip: export PYTHONWARNINGS=ignore,default:::$(PROJ)
 
-.PHONY: dev
-dev: $(DEV_ENV)
+CODECOV_OUTPUT=--cov-report term
 
-PYTEST_ARGS=-v --timeout=60 $(PYTEST_EXTRA)
+pylint: $(DEV_ENV)
+	pytest $(PROJ) \
+		--pylint --pylint-rcfile=.pylintrc \
+		--pylint-error-types=EF \
+		-m pylint \
+		--cache-clear
+
+.coverage:
+	@echo "You must run tests first!"
+	exit 1
+
+coverage-html.zip: .coverage
+	coverage html -d htmlconv
+	cd htmlconv && zip -r ../$@ .
+
+coverage.xml: .coverage
+	coverage xml
 
 test: $(DEV_ENV)
-	pytest tests $(PYTEST_ARGS)
+	pytest tests $(PYTEST_ARGS) $(PYTEST_EXTRA)
 
-testf: PYTEST_EXTRA=--log-cli-level=DEBUG --ff
+testf: PYTEST_EXTRA=--log-cli-level=DEBUG -lx --ff
 testf: test
 
-clean:
-	rm -rf tests/.pytest
-	rm -rf $(DEV_ENV) build dist *.egg-info
-	find . -name __pycache__ | xargs rm -rf
-	find . -name \*.pyc | xargs rm -f
+.PHONY: mypy
+mypy:
+	mypy --non-interactive --install-types --ignore-missing-imports $(PROJ)
+	#pytest --mypy -m mypy $(PROJ)
+	#mypy --check-untyped-defs $(PROJ)
 
-wheel:
-	$(PYTHON) setup.py bdist_wheel
+.PHONY: coverage
+coverage:
+	pytest --cov=$(PROJ) $(CODECOV_OUTPUT) tests $(PYTEST_ARGS)
 
-release:
-	@if git tag | grep -q $(PROJ)-`$(PYTHON) setup.py -V` ; then\
-		echo "Already released this version.";\
-		echo "Update the version number and try again.";\
-		exit 1;\
-	fi
+
+.PHONY: not-dirty
+not-dirty:
 	@if [ `git status --short | wc -l` != 0 ]; then\
-		echo "Uncommited code. Aborting." ;\
-		exit 1;\
+	    echo "Uncommited code. Aborting." ;\
+	    exit 1;\
 	fi
-	rm dist/*
-	$(PYTHON) setup.py bdist_wheel
-	twine upload dist/*
-	git tag $(PROJ)-`$(PYTHON) setup.py -V`
-	git push
-	git push --tags
+
+.PHONY: git-release
+git-release: wheel not-dirty
+	@if [ `git rev-parse --abbrev-ref HEAD` != main ]; then \
+	echo "You can only do a release from the main branch.";\
+	    exit 1;\
+	fi
+	@if git tag | grep -q ^$(VERSION) ; then \
+	    echo "Already released this version.";\
+	    echo "Update the version number and try again.";\
+	    exit 1;\
+        fi
+	git push &&\
+	git tag $(SIGN) $(VERSION) -m "Release v$(VERSION)" &&\
+	git push --tags &&\
+	git checkout release &&\
+	git merge $(VERSION) &&\
+	git push && git checkout main
+	@echo "Released! Note you're now on the 'main' branch."
+
+.PHONY: pypi-release
+pypi-release: wheel
+	python -m build
+	twine upload dist/$(PROJ)-$(VERSION)*
+

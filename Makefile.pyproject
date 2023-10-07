@@ -1,0 +1,44 @@
+
+default::
+	@echo "deps - rebuild requirements*.txt"
+	@echo "dev - set up the dev venv"
+	@echo "wheel - build a python wheel"
+
+clean::
+	rm -rf tests/.pytest
+	rm -rf $(DEV_ENV) build dist *.egg-info
+	find . -name __pycache__ | xargs rm -rf
+	find . -name \*.pyc | xargs rm -f
+
+INST_REQS=requirements.txt
+DEV_REQS=requirements-dev.txt
+DEV_ENV=.make-dev-deps
+PIP_TOOLS=$(VIRTUAL_ENV)/bin/pip-compile
+#CODEFMT=$(VIRTUAL_ENV)/bin/black
+
+$(PIP_TOOLS):
+	@if [ -z "$$VIRTUAL_ENV" ] ; then \
+	    echo "You should be in a virtualenv or other isolated environment before running this."; \
+	    exit 1; \
+	fi
+	pip install --upgrade pip-tools
+
+$(DEV_REQS): PIP_COMPILE_EXTRAS = --extra=dev
+$(INST_REQS) $(DEV_REQS): pyproject.toml $(PIP_TOOLS)
+	pip-compile -q --resolver=backtracking \
+		--no-strip-extras $(PIP_COMPILE_EXTRAS) \
+		--output-file=$@ $<
+
+deps: $(INST_REQS) $(DEV_REQS)
+.PHONY: deps
+
+dev: $(DEV_ENV)
+$(DEV_ENV): $(DEV_REQS) $(INST_REQS) $(PIP_TOOLS)
+	pip-sync $(DEV_REQS) $(INST_REQS)
+	pip install -e .
+	touch $(DEV_ENV)
+.PHONY: dev
+
+wheel:
+	python -m build
+.PHONY: wheel
