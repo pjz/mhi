@@ -24,7 +24,6 @@ import sys
 import time
 import email
 import shutil
-import string
 import imaplib
 import smtplib
 import tempfile
@@ -716,7 +715,7 @@ def _consolidate(data):
             str_list.append(f'{ilist[0]}-{ilist[-1]}')
         else:
             str_list.append(f'{ilist[0]}')
-    result = ','.join(str_list)
+    result = ','.join(str_list) or '0'
     _debug(lambda: f"consolidate out: {result}")
     return result
 
@@ -743,7 +742,7 @@ def pick(folder, arglist):
     if data:
         msglist = []
         for m in data:
-            msglist += [int(i) for i in m.split()]
+            msglist.extend(int(i) for i in m.split())
         print(_consolidate(msglist))
     else:
         print("0")
