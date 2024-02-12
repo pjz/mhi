@@ -18,7 +18,7 @@ configobj==5.0.8
     # via mhi (pyproject.toml)
 coverage[toml]==7.3.2
     # via pytest-cov
-cryptography==41.0.6
+cryptography==42.0.0
     # via secretstorage
 dill==0.3.7
     # via pylint
