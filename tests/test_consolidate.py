@@ -1,5 +1,5 @@
 
-from mhi import _consolidate
+from mhi.main import _consolidate
 
 def test_flatten():
     assert _consolidate([1,3,5,7,9]) == '1,3,5,7,9'

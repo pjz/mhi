@@ -7,12 +7,13 @@ import copy
 import email
 import imaplib
 
-import mhi
+from mhi import main as mhi
 #from click.testing import CliRunner # someday
-import six
 
 from imap4mock import ImapConnectionMock
 imaplib.IMAP4_SSL = ImapConnectionMock()
+
+mhi.init_config()
 
 reference_mail = {
     'headers': {

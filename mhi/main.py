@@ -1097,10 +1097,14 @@ def cmd_main():
     _cmd_dispatch(['mhi', cmd] + sys.argv[1:])
 
 
-def main():
+def init_config():
     global config, state
     cfgdir = os.environ.get('HOME', '')
     config = ConfigObj(infile=f"{cfgdir}/.mhirc", create_empty=True)
     state = ConfigObj(infile=f"{cfgdir}/.mhistate", create_empty=True)
+
+
+def main():
+    init_config()
     # main program
     _cmd_dispatch(sys.argv)
