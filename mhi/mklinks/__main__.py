@@ -5,12 +5,12 @@ import os
 import sys
 from shutil import which
 
-from .. import Commands
+from ..main import Commands
 
 
 if len(sys.argv) < 2:
     print(
-        """Usage: %s <destdir> [mhWrap path]
+        """Usage: python -m mhi.mklinks <destdir> [mhWrap path]
           destdir - required: a destination directory for the links
           mhiWrap path - optional: path to mhiWrap.  If unspecified, tries to find it on $PATH
 """

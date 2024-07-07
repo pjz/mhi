@@ -1,6 +1,6 @@
 [project]
 name = "mhi"
-version = "0.8.4"
+version = "0.8.5"
 requires-python = ">=3.8"
 description = "MH for IMAP"
 readme = "README.md"
@@ -32,7 +32,7 @@ Homepage = "http://github.com/pjz/mhi"
 Repository = "http://github.com/pjz/mhi.git"
 
 [project.gui-scripts]
-mhi = 'mhi:main'
+mhi = 'mhi:cli'
 mhiWrap = 'mhi:cmd_main'
 
 [project.optional-dependencies]
