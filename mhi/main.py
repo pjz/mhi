@@ -337,6 +337,8 @@ class Connection:
         return folders
 
     def folderstatus(self, folder):
+        if ' ' in folder:
+            folder = f'"{folder}"'
         result, data = self.raw_status(folder, '(MESSAGES RECENT UNSEEN)')
         if result != 'OK':
             return ()
