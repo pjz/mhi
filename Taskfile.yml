@@ -53,7 +53,13 @@ tasks:
     desc: "Run pylint on source"
     deps: [venv]
     cmds:
-      - uv run pytest {{.PROJ}} --pylint --pylint-rcfile=.pylintrc --pylint-error-types=EF -m pylint --cache-clear
+      - |
+        set +e
+        uv run pylint --rcfile=.pylintrc {{.PROJ}}
+        code=$?
+        set -e
+        # only fail on fatal (bit 1) or error (bit 2) findings; ignore warning/refactor/convention
+        test $((code & 3)) -eq 0
 
   test:mypy:
     desc: "Run mypy on source"

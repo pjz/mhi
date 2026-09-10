@@ -51,7 +51,7 @@ dev = [
     "pytest",
     "pytest-cov",
     "pytest-mypy",
-    "pytest-pylint",
+    "pylint",
     "pytest-timeout",
     "pytest-runfailed",
 ]
