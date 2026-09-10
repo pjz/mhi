@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mhi"
-version = "0.8.6"
+version = "0.8.8"
 requires-python = ">=3.8"
 description = "MH for IMAP"
 readme = "README.md"
