@@ -15,29 +15,26 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10']
-
-    env:
-      VIRTUAL_ENV: /usr
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+    - uses: astral-sh/setup-uv@v5
+      with:
+        enable-cache: true
+    - uses: go-task/setup-task@v1
     - name: Install dependencies
-      run: |
-        make dev
+      run: task venv
     - name: Test with pytest
-      run: |
-        make test
+      run: task test
     - name: Lint with pylint
-      run: |
-        make pylint
+      run: task test:pylint
     - name: Typecheck with mypy
-      run: |
-        make mypy
+      run: task test:mypy
 
 
 

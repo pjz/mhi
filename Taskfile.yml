@@ -1,0 +1,113 @@
+version: '3'
+
+vars:
+  PROJ:
+    sh: grep ^name pyproject.toml | sed 's/"//g' | cut -d' ' -f 3
+  VERSION:
+    sh: grep ^version pyproject.toml | sed 's/"//g' | cut -d' ' -f 3
+  VENV: .venv
+  SIGN: ''
+
+env:
+  PYTHONWARNINGS: 'ignore,default:::{{.PROJ}}'
+
+tasks:
+  default:
+    cmds:
+      - task --list
+
+  venv:
+    desc: "Create/sync the dev virtualenv with uv"
+    preconditions:
+      - sh: type -p uv
+        msg: 'uv must be installed'
+    cmds:
+      - uv sync --extra dev
+
+  wheel:
+    desc: "Build a wheel"
+    deps: [venv]
+    cmds:
+      - uv build
+
+  test:
+    desc: "Run the full test suite"
+    deps:
+      - test:mypy
+      - test:pylint
+      - test:pytest
+
+  test:pytest:
+    desc: "Run the test suite"
+    deps: [venv]
+    cmds:
+      - uv run pytest tests {{.CLI_ARGS}}
+
+  testf:
+    desc: "Run tests, stop at first failure, with debug logging"
+    deps: [venv]
+    cmds:
+      - uv run pytest tests --log-cli-level=DEBUG -lx --ff {{.CLI_ARGS}}
+
+  test:pylint:
+    desc: "Run pylint on source"
+    deps: [venv]
+    cmds:
+      - uv run pytest {{.PROJ}} --pylint --pylint-rcfile=.pylintrc --pylint-error-types=EF -m pylint --cache-clear
+
+  test:mypy:
+    desc: "Run mypy on source"
+    deps: [venv]
+    cmds:
+      - uv run mypy --non-interactive --install-types --ignore-missing-imports {{.PROJ}}
+
+  coverage:
+    desc: "Run tests with coverage"
+    deps: [venv]
+    cmds:
+      - uv run pytest --cov={{.PROJ}} --cov-report term tests {{.CLI_ARGS}}
+
+  coverage:xml:
+    desc: "Generate coverage.xml"
+    deps: [coverage]
+    cmds:
+      - uv run coverage xml
+
+  coverage:html:
+    desc: "Generate a zipped HTML coverage report"
+    deps: [coverage]
+    cmds:
+      - uv run coverage html -d htmlconv
+      - cd htmlconv && zip -r ../coverage-html.zip .
+
+  clean:
+    desc: "Remove build artifacts and the venv"
+    cmds:
+      - rm -rf tests/.pytest {{.VENV}} build dist *.egg-info
+      - find . -name __pycache__ -exec rm -rf {} +
+      - find . -name '*.pyc' -delete
+
+  release:git:
+    desc: "Tag and push a release to the release branch"
+    deps: [wheel]
+    preconditions:
+      - sh: test -z "$(git status --short)"
+        msg: "Uncommitted code. Aborting."
+      - sh: test "$(git rev-parse --abbrev-ref HEAD)" = main
+        msg: "You can only do a release from the main branch."
+      - sh: '! git tag | grep -q "^{{.VERSION}}$"'
+        msg: "Already released this version. Update the version number in pyproject.toml and try again."
+    cmds:
+      - git push
+      - git tag {{.SIGN}} {{.VERSION}} -m "Release v{{.VERSION}}"
+      - git push --tags
+      - git checkout release
+      - git merge {{.VERSION}}
+      - git push
+      - git checkout main
+
+  release:pypi:
+    desc: "Publish the built wheel/sdist to PyPI"
+    deps: [wheel]
+    cmds:
+      - uv publish dist/{{.PROJ}}-{{.VERSION}}*

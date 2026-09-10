@@ -46,6 +46,17 @@ via:
 
 
 
+Development
+-----------
+
+This project uses [Task](https://taskfile.dev) and [uv](https://docs.astral.sh/uv/):
+
+    task venv         # create/sync the dev virtualenv
+    task test         # run the test suite
+    task test:pylint  # lint
+    task test:mypy    # typecheck
+    task coverage     # run tests with coverage
+
 TODO:
 -----
 
